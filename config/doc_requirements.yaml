@@ -1,0 +1,14 @@
+ITR-1:
+  required:
+    - Form 16 (from employer)
+    - Bank interest certificates
+    - 26AS / AIS
+  if_has_house_property:
+    - Home loan interest certificate
+    - Municipal tax receipts
+
+GSTR-3B:
+  required:
+    - All sales invoices for the month
+    - All purchase invoices with GST
+    - Bank statement (for reconciliation)

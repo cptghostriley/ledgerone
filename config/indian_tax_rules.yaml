@@ -1,0 +1,22 @@
+deadlines:
+  itr_filing:
+    - {type: "non-audit", text: "31 July"}
+    - {type: "audit", text: "31 October"}
+    - {type: "belated", text: "31 December"}
+  gstr_1:
+    - {type: "monthly", rule: "11th of following month"}
+    - {type: "quarterly", rule: "13th after quarter end"}
+  gstr_3b:
+    - {rule: "20th of following month"}
+  tds_return:
+    - {quarter: "Q1", text: "31 July"}
+    - {quarter: "Q2", text: "31 Oct"}
+    - {quarter: "Q3", text: "31 Jan"}
+    - {quarter: "Q4", text: "31 May"}
+  tds_payment:
+    - {rule: "7th of following month Except March (30 April)"}
+  advance_tax:
+    - {percent: 15, text: "15 June"}
+    - {percent: 45, text: "15 Sept"}
+    - {percent: 75, text: "15 Dec"}
+    - {percent: 100, text: "15 March"}
