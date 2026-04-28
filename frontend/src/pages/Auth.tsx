@@ -8,10 +8,53 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Logo } from "@/components/logo";
+import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 
 export default function Auth() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+
+  const adminSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const formData = new FormData(e.target as HTMLFormElement);
+    const data = Object.fromEntries(formData);
+    
+    try {
+      if (!otpSent) {
+        const res = await fetch("/api/v1/auth/admin-login-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: data.email })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || "Failed to send OTP");
+        }
+        setOtpSent(true);
+        toast.success("OTP sent to email");
+      } else {
+        const res = await fetch("/api/v1/auth/admin-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: data.email, otp: data.otp })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || "Login failed");
+        }
+        const json = await res.json();
+        localStorage.setItem("access_token", json.data.access_token);
+        toast.success("Admin login successful");
+        navigate("/");
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +111,7 @@ export default function Auth() {
   };
 
   return (
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || "123456789-placeholder.apps.googleusercontent.com"}>
     <div className="dark relative min-h-screen overflow-hidden bg-background text-foreground">
       <div className="relative grid min-h-screen lg:grid-cols-[1.1fr_0.9fr]">
         {/* Left — aurora hero */}
@@ -144,7 +188,7 @@ export default function Auth() {
             <div className="grid gap-3">
               {[
                 { icon: Lock, title: "Client confidentiality, by design", desc: "Documents never leave your infrastructure." },
-                { icon: ServerCog, title: "Powered by local Gemma 2", desc: "Air-gapped Ollama runtime, no API calls." },
+                { icon: ServerCog, title: "Powered by local Gemma 4:e4b", desc: "Air-gapped Ollama runtime, no API calls." },
                 { icon: Shield, title: "Built for ICAI compliance", desc: "Audit trails, role-based access, retention." },
               ].map((f) => (
                 <div
@@ -172,7 +216,7 @@ export default function Auth() {
           </div>
 
           <div className="relative text-[12px] text-white/55">
-            © 2026 CA Intelligence · Built for ICAI-registered firms in India
+            © 2026 LedgerOne · Built for ICAI-registered firms in India
           </div>
         </div>
 
@@ -206,9 +250,10 @@ export default function Auth() {
               </div>
 
               <Tabs defaultValue="login" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 rounded-full border border-border/60 bg-muted/40 p-1">
+                <TabsList className="grid w-full grid-cols-3 rounded-full border border-border/60 bg-muted/40 p-1">
                   <TabsTrigger value="login" className="rounded-full data-[state=active]:bg-card data-[state=active]:shadow-sm">Sign in</TabsTrigger>
                   <TabsTrigger value="register" className="rounded-full data-[state=active]:bg-card data-[state=active]:shadow-sm">Register firm</TabsTrigger>
+                  <TabsTrigger value="admin" className="rounded-full data-[state=active]:bg-card data-[state=active]:shadow-sm">Admin</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="login" className="mt-7 space-y-5">
@@ -244,9 +289,37 @@ export default function Auth() {
                     <div className="h-px flex-1 bg-border" />
                   </div>
 
-                  <Button variant="outline" className="h-11 w-full rounded-xl bg-background/40 font-medium backdrop-blur">
-                    Continue with SSO (Google Workspace)
-                  </Button>
+                  <div className="flex justify-center w-full">
+                    <GoogleLogin
+                      onSuccess={async (credentialResponse) => {
+                        setLoading(true);
+                        try {
+                          const res = await fetch("/api/v1/auth/google", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ token: credentialResponse.credential })
+                          });
+                          if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(err.detail || "Google Login failed");
+                          }
+                          const json = await res.json();
+                          localStorage.setItem("access_token", json.data.access_token);
+                          toast.success("Login successful");
+                          navigate("/");
+                        } catch (err: any) {
+                          toast.error(err.message);
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      onError={() => {
+                        toast.error("Google Login Failed");
+                      }}
+                      theme="filled_black"
+                      text="continue_with"
+                    />
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="register" className="mt-7 space-y-5">
@@ -284,6 +357,31 @@ export default function Auth() {
                     </Button>
                   </form>
                 </TabsContent>
+
+                <TabsContent value="admin" className="mt-7 space-y-5">
+                  <div>
+                    <h2 className="font-display text-2xl font-semibold tracking-tight">Admin Portal</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Sign in with OTP sent to your email.
+                    </p>
+                  </div>
+
+                  <form onSubmit={adminSubmit} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="adminEmail">Admin email</Label>
+                      <Input id="adminEmail" name="email" type="email" placeholder="admin@firm.in" required className="h-11 rounded-xl bg-background/60" />
+                    </div>
+                    {otpSent && (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="adminOtp">OTP</Label>
+                        <Input id="adminOtp" name="otp" type="text" placeholder="123456" required className="h-11 rounded-xl bg-background/60" />
+                      </div>
+                    )}
+                    <Button type="submit" disabled={loading} className="relative h-11 w-full overflow-hidden rounded-xl bg-gradient-aurora font-semibold text-white shadow-glow transition-transform hover:scale-[1.01]">
+                      {loading ? "Processing…" : (otpSent ? "Login as Admin" : "Send OTP")}
+                    </Button>
+                  </form>
+                </TabsContent>
               </Tabs>
 
               <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
@@ -295,5 +393,7 @@ export default function Auth() {
         </div>
       </div>
     </div>
+    </GoogleOAuthProvider>
   );
 }
+

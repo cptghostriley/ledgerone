@@ -5,7 +5,6 @@ import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
-import { jobs } from "@/lib/mock-data";
 import { formatDistanceToNow, format } from "date-fns";
 
 const FILTERS = ["All", "Active", "Completed", "Failed"] as const;
@@ -25,7 +24,7 @@ export default function Jobs() {
     refetchInterval: 3000
   });
 
-  const jobsData = serverJobs?.length ? serverJobs : jobs;
+  const jobsData = serverJobs || [];
 
   const filtered = jobsData.filter((j: any) => {
     if (filter === "All") return true;

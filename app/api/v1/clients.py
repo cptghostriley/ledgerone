@@ -1,25 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from typing import List
 from uuid import UUID
 
 from app.core.database import get_db
 from app.models.models import Client, Firm
 from app.schemas.client import ClientCreate, ClientOut
-from app.api.deps import get_current_firm, get_or_404
+from app.api.deps import get_current_firm, get_or_404, get_current_user
+from app.models.models import User
 from app.core.response import create_response
 
 router = APIRouter()
 
-@router.get("", response_model=dict)
+@router.get("")
 async def get_clients(
     firm: Firm = Depends(get_current_firm),
     db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(select(Client).where(Client.firm_id == firm.id))
     clients = result.scalars().all()
-    # Add status mocked for now based on what frontend expects
     out = []
     for c in clients:
         co = ClientOut.model_validate(c).model_dump()
@@ -27,14 +27,25 @@ async def get_clients(
         out.append(co)
     return create_response(data=out)
 
-@router.post("", response_model=dict)
+@router.post("")
 async def create_client(
     data: ClientCreate,
     firm: Firm = Depends(get_current_firm),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    # Prevent duplicate by name within same firm
+    existing = await db.execute(
+        select(Client).where(
+            and_(Client.firm_id == firm.id, Client.name == data.name)
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail=f"A client named '{data.name}' already exists in this firm.")
+
     client = Client(
         firm_id=firm.id,
+        user_id=user.id,
         **data.model_dump()
     )
     db.add(client)
@@ -42,7 +53,7 @@ async def create_client(
     await db.refresh(client)
     return create_response(data=ClientOut.model_validate(client).model_dump())
 
-@router.get("/{client_id}", response_model=dict)
+@router.get("/{client_id}")
 async def get_client(
     client_id: UUID,
     firm: Firm = Depends(get_current_firm),
@@ -52,3 +63,14 @@ async def get_client(
     out = ClientOut.model_validate(client).model_dump()
     out['status'] = 'active'
     return create_response(data=out)
+
+@router.delete("/{client_id}")
+async def delete_client(
+    client_id: UUID,
+    firm: Firm = Depends(get_current_firm),
+    db: AsyncSession = Depends(get_db)
+):
+    client = await get_or_404(db, Client, client_id, firm.id)
+    await db.delete(client)
+    await db.commit()
+    return create_response(data={"deleted": str(client_id)})

@@ -13,6 +13,9 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class GoogleLoginRequest(BaseModel):
+    token: str
+
 class FirmCreate(BaseModel):
     email: EmailStr
     password: str
@@ -35,3 +38,10 @@ class FirmOut(BaseModel):
     
     class Config:
         from_attributes = True
+
+class AdminOTPRequest(BaseModel):
+    email: EmailStr
+
+class AdminOTPVerify(BaseModel):
+    email: EmailStr
+    otp: str

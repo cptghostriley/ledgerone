@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ServerCog, UserPlus, CheckCircle2, AlertCircle, Trash2, Mail, Building2, Shield, Database } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -23,6 +24,20 @@ const team = [
 export default function Settings() {
   const [ollamaStatus, setOllamaStatus] = useState<"idle" | "testing" | "ok" | "error">("ok");
   const [activeTab, setActiveTab] = useState("firm");
+
+  const { data: meData, isLoading } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/v1/auth/me", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json().then(d => d.data);
+    }
+  });
+
+  const firmName = meData?.firm?.name || "Mehta & Co. Chartered Accountants";
+  const contactEmail = meData?.user?.email || "contact@mehtaco.in";
 
   const testOllama = () => {
     setOllamaStatus("testing");
@@ -69,9 +84,9 @@ export default function Settings() {
               <h3 className="font-display text-base font-bold">Firm profile</h3>
               <p className="text-sm text-muted-foreground">Visible on reports and reminders sent to clients.</p>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5"><Label>Firm name</Label><Input defaultValue="Mehta &amp; Co. Chartered Accountants" /></div>
+                <div className="space-y-1.5"><Label>Firm name</Label><Input defaultValue={firmName} key={firmName} /></div>
                 <div className="space-y-1.5"><Label>ICAI Firm Reg. No.</Label><Input defaultValue="0123456C" className="font-mono" /></div>
-                <div className="space-y-1.5"><Label>Primary contact email</Label><Input defaultValue="contact@mehtaco.in" /></div>
+                <div className="space-y-1.5"><Label>Primary contact email</Label><Input defaultValue={contactEmail} key={contactEmail} /></div>
                 <div className="space-y-1.5"><Label>Phone</Label><Input defaultValue="+91 22 4567 8900" className="font-mono" /></div>
                 <div className="space-y-1.5 sm:col-span-2"><Label>Office address</Label><Input defaultValue="404, Maker Chambers V, Nariman Point, Mumbai 400021" /></div>
               </div>

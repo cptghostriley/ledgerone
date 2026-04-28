@@ -3,7 +3,15 @@ import datetime
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import declarative_base, relationship
-from pgvector.sqlalchemy import Vector
+
+try:
+    from pgvector.sqlalchemy import Vector as _Vector
+    def VectorCol(dim: int):
+        return Column(_Vector(dim))
+except Exception:
+    # pgvector not installed — fall back to Text so the app still starts
+    def VectorCol(dim: int):
+        return Column(Text)
 
 Base = declarative_base()
 
@@ -26,6 +34,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="staff") # owner, manager, staff
     is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
 
     firm = relationship("Firm", back_populates="users")
 
@@ -33,6 +42,7 @@ class Client(Base):
     __tablename__ = "clients"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     firm_id = Column(UUID(as_uuid=True), ForeignKey("firms.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     name = Column(String, nullable=False)
     pan = Column(String)
     gstin = Column(String)
@@ -42,6 +52,15 @@ class Client(Base):
 
     firm = relationship("Firm", back_populates="clients")
     documents = relationship("Document", back_populates="client")
+
+class SchemaDef(Base):
+    __tablename__ = "schema_defs"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = Column(UUID(as_uuid=True), ForeignKey("firms.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    fields = Column(JSONB)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class Document(Base):
     __tablename__ = "documents"
@@ -53,11 +72,12 @@ class Document(Base):
     mime_type = Column(String)
     doc_type = Column(String)
     financial_year = Column(String)
-    status = Column(String)
+    status = Column(String, default="pending")
     extracted_data = Column(JSONB)
     anomalies = Column(JSONB)
     confidence = Column(Float)
     processing_ms = Column(Integer)
+    uploaded_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     client = relationship("Client", back_populates="documents")
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
@@ -69,7 +89,7 @@ class DocumentChunk(Base):
     chunk_index = Column(Integer)
     raw_text = Column(String)
     extracted_data = Column(JSONB)
-    embedding = Column(Vector(768))
+    embedding = VectorCol(768)
 
     document = relationship("Document", back_populates="chunks")
 
@@ -108,6 +128,7 @@ class Job(Base):
     __tablename__ = "jobs"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     firm_id = Column(UUID(as_uuid=True), ForeignKey("firms.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     task_name = Column(String)
     status = Column(String)
     payload = Column(JSONB)

@@ -464,7 +464,7 @@ export default function ClientDetail() {
                 <div className="flex items-center gap-2">
                   <Bot className="h-4 w-4 text-primary" />
                   <h3 className="font-display text-sm font-bold">Ask anything about {client.name}</h3>
-                  <span className="ml-auto text-[10px] font-medium text-muted-foreground">Powered by Gemma 2 · runs locally</span>
+                  <span className="ml-auto text-[10px] font-medium text-muted-foreground">Powered by Gemma 4:e4b · runs locally</span>
                 </div>
               </div>
 
@@ -601,3 +601,4 @@ export default function ClientDetail() {
     </div>
   );
 }
+

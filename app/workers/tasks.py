@@ -6,7 +6,7 @@ import asyncio
 
 from celery import shared_task
 from app.workers.celery_app import celery_app
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, engine
 from app.models.models import Job, Document
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ async def _update_job_status(job_id: str, status: str, result: dict = None, erro
             if error is not None:
                 job.error = error
             if status in ["completed", "failed"]:
-                job.completed_at = datetime.now(timezone.utc)
+                job.completed_at = datetime.utcnow()
             await db.commit()
 
 async def run_pipeline(document_id: str, firm_id: str, job_id: str):
@@ -84,24 +84,28 @@ async def run_pipeline(document_id: str, firm_id: str, job_id: str):
         doc.extracted_data = merged_data
         doc.confidence = confidence
         doc.anomalies = anomalies
+        doc.financial_year = financial_year
         await db.commit()
 
 @celery_app.task(bind=True, max_retries=3)
-def process_document_task(self, document_id: str, firm_id: str, job_id: str):
+def process_document_task(self, document_id: str, firm_id: str, job_id: str, schema_id: str = None):
     logger.info(f"Starting pipeline for document {document_id}")
-    try:
-        asyncio.run(_update_job_status(job_id, "processing"))
-        asyncio.run(run_pipeline(document_id, firm_id, job_id))
-        asyncio.run(_update_job_status(job_id, "completed", result={"document_id": document_id}))
-    except Exception as exc:
-        logger.error(f"Pipeline failed: {exc}")
-        asyncio.run(_update_job_status(job_id, "failed", error=str(exc)))
-        
-        async def _mark_doc_failed():
+
+    async def _execute_all():
+        try:
+            await _update_job_status(job_id, "processing")
+            await run_pipeline(document_id, firm_id, job_id)
+            await _update_job_status(job_id, "completed", result={"document_id": document_id})
+        except Exception as exc:
+            logger.error(f"Pipeline failed: {exc}")
+            await _update_job_status(job_id, "failed", error=str(exc))
+
             async with AsyncSessionLocal() as db:
                 doc = await db.get(Document, UUID(document_id))
                 if doc:
                     doc.status = "failed"
                     await db.commit()
-        asyncio.run(_mark_doc_failed())
-        # We don't automatically retry on business logic failure unless it was a network drop
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_execute_all())

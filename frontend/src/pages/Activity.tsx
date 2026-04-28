@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Activity as ActivityIcon, Upload as UploadIcon, MessageSquare, AlertTriangle,
   FileCheck2, Sparkles, Filter, Download, Search,
@@ -8,99 +9,79 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
-import { recentActivity, clients, jobs } from "@/lib/mock-data";
 import { formatDistanceToNow } from "date-fns";
 
 type FeedItem = {
   id: string;
-  type: "recon" | "upload" | "comment" | "extract" | "flag" | "ai" | "job";
+  type: "recon" | "upload" | "comment" | "extract" | "flag" | "ai" | "job" | "processing" | "system" | "alert";
   text: string;
   timestamp: string;
   actor?: string;
   client?: string;
 };
 
-// Build a richer in-memory feed from existing mock data
-const FEED: FeedItem[] = [
-  ...recentActivity.map((a, i): FeedItem => ({
-    id: a.id,
-    type: a.type as FeedItem["type"],
-    text: a.text,
-    timestamp: new Date(Date.now() - 1000 * 60 * (12 + i * 27)).toISOString(),
-    actor: ["Anjali Mehta", "Rohan Shah", "System", "Gemma 2"][i % 4],
-    client: clients[i % clients.length]?.name,
-  })),
-  ...jobs.slice(0, 6).map((j, i): FeedItem => ({
-    id: `job-${j.id}`,
-    type: "job",
-    text: `${j.type} · ${j.status} (${j.progress}%)`,
-    timestamp: new Date(Date.now() - 1000 * 60 * (45 + i * 53)).toISOString(),
-    actor: "Pipeline",
-    client: clients[(i + 2) % clients.length]?.name,
-  })),
-  {
-    id: "ai-1",
-    type: "ai" as const,
-    text: "AI insight generated: ITC mismatch flagged on Sharma Textiles (₹48,210)",
-    timestamp: new Date(Date.now() - 1000 * 60 * 6).toISOString(),
-    actor: "Gemma 2",
-    client: "Sharma Textiles Pvt Ltd",
-  },
-  {
-    id: "ai-2",
-    type: "ai" as const,
-    text: "Reconciliation summary drafted for Greenleaf Organics",
-    timestamp: new Date(Date.now() - 1000 * 60 * 88).toISOString(),
-    actor: "Gemma 2",
-    client: "Greenleaf Organics",
-  },
-].sort((a, b) => +new Date(b.timestamp) - +new Date(a.timestamp));
-
-const TYPE_META: Record<FeedItem["type"], { icon: typeof ActivityIcon; label: string; tone: string }> = {
-  recon: { icon: FileCheck2, label: "Reconciliation", tone: "bg-success/15 text-success border-success/30" },
-  upload: { icon: UploadIcon, label: "Upload", tone: "bg-info/15 text-info border-info/30" },
-  comment: { icon: MessageSquare, label: "Comment", tone: "bg-aurora-3/15 text-aurora-3 border-aurora-3/30" },
-  extract: { icon: Sparkles, label: "Extraction", tone: "bg-primary/15 text-primary border-primary/30" },
-  flag: { icon: AlertTriangle, label: "Anomaly", tone: "bg-destructive/15 text-destructive border-destructive/30" },
-  ai: { icon: Sparkles, label: "AI", tone: "bg-aurora-1/15 text-aurora-1 border-aurora-1/30" },
-  job: { icon: ActivityIcon, label: "Job", tone: "bg-warning/15 text-warning border-warning/30" },
+const TYPE_META: Record<string, { icon: typeof ActivityIcon; label: string; tone: string }> = {
+  recon:      { icon: FileCheck2,    label: "Reconciliation", tone: "bg-success/15 text-success border-success/30" },
+  upload:     { icon: UploadIcon,    label: "Upload",         tone: "bg-info/15 text-info border-info/30" },
+  comment:    { icon: MessageSquare, label: "Comment",        tone: "bg-purple-500/15 text-purple-400 border-purple-500/30" },
+  extract:    { icon: Sparkles,      label: "Extraction",     tone: "bg-primary/15 text-primary border-primary/30" },
+  flag:       { icon: AlertTriangle, label: "Anomaly",        tone: "bg-destructive/15 text-destructive border-destructive/30" },
+  alert:      { icon: AlertTriangle, label: "Anomaly",        tone: "bg-destructive/15 text-destructive border-destructive/30" },
+  ai:         { icon: Sparkles,      label: "AI",             tone: "bg-violet-500/15 text-violet-400 border-violet-500/30" },
+  job:        { icon: ActivityIcon,  label: "Job",            tone: "bg-warning/15 text-warning border-warning/30" },
+  processing: { icon: ActivityIcon,  label: "Job",            tone: "bg-warning/15 text-warning border-warning/30" },
+  system:     { icon: FileCheck2,    label: "System",         tone: "bg-success/15 text-success border-success/30" },
 };
 
-const FILTERS: { key: "all" | FeedItem["type"]; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "ai", label: "AI" },
-  { key: "upload", label: "Uploads" },
-  { key: "recon", label: "Reconciliation" },
-  { key: "flag", label: "Anomalies" },
-  { key: "job", label: "Jobs" },
-  { key: "comment", label: "Comments" },
+const FILTERS: { key: "all" | string; label: string }[] = [
+  { key: "all",        label: "All" },
+  { key: "ai",         label: "AI" },
+  { key: "upload",     label: "Uploads" },
+  { key: "recon",      label: "Reconciliation" },
+  { key: "flag",       label: "Anomalies" },
+  { key: "job",        label: "Jobs" },
+  { key: "processing", label: "Processing" },
+  { key: "comment",    label: "Comments" },
 ];
 
+const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem("access_token")}` });
+
 export default function Activity() {
-  const [filter, setFilter] = useState<"all" | FeedItem["type"]>("all");
+  const [filter, setFilter] = useState<string>("all");
   const [query, setQuery] = useState("");
 
+  const { data: feed = [], isLoading } = useQuery<FeedItem[]>({
+    queryKey: ["activity"],
+    queryFn: async () => {
+      const res = await fetch("/api/v1/activity", { headers: authHeader() });
+      if (!res.ok) throw new Error("Failed to load activity");
+      return res.json().then(d => d.data ?? []);
+    },
+    refetchInterval: 10_000,
+  });
+
   const items = useMemo(() => {
-    return FEED.filter((it) => {
-      if (filter !== "all" && it.type !== filter) return false;
+    return feed.filter((it) => {
+      const typeMatch = filter === "all" || it.type === filter || (filter === "flag" && it.type === "alert");
+      if (!typeMatch) return false;
       if (query) {
         const q = query.toLowerCase();
         return (
-          it.text.toLowerCase().includes(q) ||
+          it.text?.toLowerCase().includes(q) ||
           it.actor?.toLowerCase().includes(q) ||
           it.client?.toLowerCase().includes(q)
         );
       }
       return true;
     });
-  }, [filter, query]);
+  }, [filter, query, feed]);
 
   // Group by day
   const groups = useMemo(() => {
     const map = new Map<string, FeedItem[]>();
     for (const it of items) {
-      const d = new Date(it.timestamp);
-      const key = d.toDateString();
+      if (!it.timestamp) continue;
+      const key = new Date(it.timestamp).toDateString();
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(it);
     }
@@ -108,11 +89,11 @@ export default function Activity() {
   }, [items]);
 
   const stats = useMemo(() => ({
-    total: FEED.length,
-    today: FEED.filter((i) => new Date(i.timestamp).toDateString() === new Date().toDateString()).length,
-    anomalies: FEED.filter((i) => i.type === "flag").length,
-    ai: FEED.filter((i) => i.type === "ai").length,
-  }), []);
+    total: feed.length,
+    today: feed.filter((i) => i.timestamp && new Date(i.timestamp).toDateString() === new Date().toDateString()).length,
+    anomalies: feed.filter((i) => i.type === "flag" || i.type === "alert").length,
+    ai: feed.filter((i) => i.type === "ai" || i.type === "extract").length,
+  }), [feed]);
 
   return (
     <div className="flex flex-col">
@@ -132,9 +113,9 @@ export default function Activity() {
         {/* Stat cards */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: "Events (30d)", value: stats.total, tone: "text-primary" },
+            { label: "Total events", value: stats.total, tone: "text-primary" },
             { label: "Today", value: stats.today, tone: "text-info" },
-            { label: "AI generated", value: stats.ai, tone: "text-aurora-1" },
+            { label: "AI generated", value: stats.ai, tone: "text-violet-400" },
             { label: "Open anomalies", value: stats.anomalies, tone: "text-destructive" },
           ].map((s) => (
             <Card key={s.label} className="border-border/70 bg-gradient-surface p-5 shadow-elegant">
@@ -177,7 +158,12 @@ export default function Activity() {
 
         {/* Timeline */}
         <Card className="border-border/70 bg-card p-6 shadow-elegant">
-          {groups.length === 0 ? (
+          {isLoading ? (
+            <div className="grid place-items-center py-16 text-center">
+              <ActivityIcon className="h-8 w-8 animate-pulse text-muted-foreground/60" />
+              <p className="mt-3 text-sm text-muted-foreground">Loading activity…</p>
+            </div>
+          ) : groups.length === 0 ? (
             <div className="grid place-items-center py-16 text-center">
               <ActivityIcon className="h-8 w-8 text-muted-foreground/60" />
               <p className="mt-3 text-sm text-muted-foreground">No events match your filter.</p>
@@ -198,7 +184,7 @@ export default function Activity() {
 
                   <ol className="relative space-y-3 border-l border-border/60 pl-6">
                     {list.map((it) => {
-                      const meta = TYPE_META[it.type];
+                      const meta = TYPE_META[it.type] ?? TYPE_META["system"];
                       const Icon = meta.icon;
                       return (
                         <li key={it.id} className="relative">
@@ -212,7 +198,7 @@ export default function Activity() {
                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                                   {it.actor && <span>by <span className="text-foreground/80">{it.actor}</span></span>}
                                   {it.client && <span>· {it.client}</span>}
-                                  <span>· {formatDistanceToNow(new Date(it.timestamp), { addSuffix: true })}</span>
+                                  {it.timestamp && <span>· {formatDistanceToNow(new Date(it.timestamp), { addSuffix: true })}</span>}
                                 </div>
                               </div>
                               <Badge variant="outline" className="shrink-0 rounded-full text-[10px] uppercase tracking-wider">

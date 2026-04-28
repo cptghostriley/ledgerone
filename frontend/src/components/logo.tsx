@@ -40,10 +40,10 @@ export function Logo({ collapsed = false, className }: { collapsed?: boolean; cl
       {!collapsed && (
         <div className="flex flex-col leading-none">
           <span className="font-display text-[15px] font-semibold tracking-tight text-sidebar-accent-foreground">
-            CA Intelligence
+            LedgerOne
           </span>
           <span className="mt-1 text-[10px] font-medium uppercase tracking-[0.18em] text-sidebar-foreground/55">
-            Aurora workspace
+            Built for accuracy, trusted for compliance
           </span>
         </div>
       )}

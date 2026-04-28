@@ -13,12 +13,14 @@ from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
+# Do NOT create a global async Redis client — it binds to an event loop.
+# Instead, create it lazily inside each async call so it uses the current loop.
+def _get_redis():
+    return redis.from_url(settings.redis_url)
+
 class ReconciliationContext:
     def __init__(self, data_by_type: Dict[str, List[Dict[str, Any]]]):
         self.data_by_type = data_by_type
-
-# Booting up a global redis connection. In real production, this can exist within FastAPI lifetime hooks.
-redis_client = redis.from_url(settings.redis_url)
 
 def check_26as_vs_itr(ctx: ReconciliationContext) -> CheckResult:
     # Logic: Compare TDS entries in Form 26AS against what client declared in their ITR draft.
@@ -46,9 +48,10 @@ CHECK_FUNCTIONS = {
     "tds_deducted": check_tds_deducted_vs_tds_cert
 }
 
+
 async def generate_reconciliation_report(db: AsyncSession, firm_id: UUID, client_id: UUID, financial_year: str) -> dict:
     """Run all declarative checks and map outputs caching inside Redis content hashes."""
-    # Fetch all processed documents for client + FY
+    redis_client = _get_redis()
     result = await db.execute(
         select(Document).where(
             Document.firm_id == firm_id,
@@ -67,6 +70,7 @@ async def generate_reconciliation_report(db: AsyncSession, firm_id: UUID, client
     cached = await redis_client.get(cache_key)
     if cached:
         logger.info("Cache Hit: Returning reconciliation report")
+        await redis_client.aclose()
         return json.loads(cached)
         
     # Isolate context payloads
@@ -101,7 +105,12 @@ async def generate_reconciliation_report(db: AsyncSession, firm_id: UUID, client
     }
     
     # Cache mapping via redis
-    await redis_client.setex(cache_key, settings.reconciliation_cache_ttl, json.dumps(report))
+    try:
+        await redis_client.setex(cache_key, settings.reconciliation_cache_ttl, json.dumps(report))
+    except Exception as e:
+        logger.warning(f"Redis cache write failed: {e}")
+    finally:
+        await redis_client.aclose()
     
     # Historical insert
     db_result = ReconciliationResult(
