@@ -162,7 +162,8 @@ export default function Jobs() {
 
                 {j.status === "completed" && j.durationMs && (
                   <p className="mt-3 text-[11px] text-muted-foreground">
-                    Completed in {Math.round(j.durationMs / 1000)}s · finished {format(new Date(+new Date(j.startedAt) + j.durationMs), "HH:mm")}
+                    Completed in {Math.round(j.durationMs / 1000)}s
+                    {j.startedAt && !isNaN(new Date(j.startedAt).getTime()) && ` · finished ${format(new Date(+new Date(j.startedAt) + j.durationMs), "HH:mm")}`}
                   </p>
                 )}
               </Card>

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.auth import verify_password, get_password_hash, create_access_token
 from app.models.models import User, Firm, UserFirmMapping, Invite
-from app.schemas.auth import Token, UserLogin, FirmCreate, UserOut, FirmOut, GoogleLoginRequest, AdminOTPRequest, AdminOTPVerify, InviteRequest, AcceptInviteRequest
+from app.schemas.auth import Token, UserLogin, FirmCreate, UserOut, FirmOut, GoogleLoginRequest, AdminOTPRequest, AdminOTPVerify, AdminActivateRequest, JoinFirmRequest, ApproveUserRequest, SignupRequest
 from app.core.response import create_response
 from app.api.deps import get_current_user, get_current_firm
 from app.services.mail import send_otp_email, notify_admin_new_registration
@@ -28,34 +28,27 @@ async def register_firm(
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    firm = Firm(name=data.firm_name)
+    import string
+    import hashlib
+    
+    firm_key_raw = "FRN-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    admin_key_raw = "".join(random.choices(string.ascii_letters + string.digits, k=32))
+    
+    firm = Firm(
+        name=data.firm_name,
+        firm_key_hash=hashlib.sha256(firm_key_raw.encode()).hexdigest(),
+        one_time_admin_key_hash=hashlib.sha256(admin_key_raw.encode()).hexdigest()
+    )
     db.add(firm)
-    await db.flush()
-
-    user = User(
-        email=data.email,
-        hashed_password=get_password_hash(data.password),
-    )
-    db.add(user)
-    await db.flush()
-
-    mapping = UserFirmMapping(
-        user_id=user.id,
-        firm_id=firm.id,
-        role="Admin/Owner"
-    )
-    db.add(mapping)
     await db.commit()
 
-    # Notify admin in background
     background_tasks.add_task(notify_admin_new_registration, data.firm_name, data.email)
 
-    access_token = create_access_token(subject=str(user.id), firm_id=str(firm.id))
     return create_response(
         data={
-            "access_token": access_token,
-            "token_type": "bearer",
-            "user": {"id": str(user.id), "email": user.email},
+            "firm_name": firm.name,
+            "firm_key": firm_key_raw,
+            "admin_key": admin_key_raw
         }
     )
 
@@ -192,104 +185,153 @@ async def admin_login(data: AdminOTPVerify, db: AsyncSession = Depends(get_db)):
         }
     )
 
-@router.post("/invite")
-async def invite_user(
-    data: InviteRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    current_firm: Firm = Depends(get_current_firm)
-):
-    mapping_result = await db.execute(
-        select(UserFirmMapping).where(
-            UserFirmMapping.user_id == current_user.id, 
-            UserFirmMapping.firm_id == current_firm.id
-        )
-    )
-    mapping = mapping_result.scalar_one_or_none()
-    
-    if not mapping or mapping.role not in ["Admin/Owner"]:
-        raise HTTPException(status_code=403, detail="Not authorized to invite users")
-        
-    import uuid
-    import datetime
-    from jose import jwt
-    from app.core.config import settings
-    
-    expire = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=48)
-    token_payload = {
-        "exp": expire,
-        "email": data.email,
-        "firm_id": str(current_firm.id),
-        "role": data.role
-    }
-    invite_token = jwt.encode(token_payload, settings.jwt_secret, algorithm="HS256")
-    
-    invite = Invite(
-        firm_id=current_firm.id,
-        email=data.email,
-        token=invite_token,
-        role=data.role
-    )
-    db.add(invite)
-    await db.commit()
-    
-    invite_link = f"https://app.yourdomain.com/accept-invite?token={invite_token}"
-    import logging
-    logging.getLogger(__name__).info(f"Invite email to {data.email}: {invite_link}")
-    
-    return create_response(data={"message": "Invite sent successfully", "link": invite_link})
-
-
-@router.post("/accept-invite")
-async def accept_invite(
-    data: AcceptInviteRequest,
+@router.post("/activate-admin")
+async def activate_admin(
+    data: AdminActivateRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    from jose import jwt, JWTError
-    from app.core.config import settings
+    import hashlib
+    admin_key_hash = hashlib.sha256(data.admin_key.encode()).hexdigest()
     
-    try:
-        payload = jwt.decode(data.token, settings.jwt_secret, algorithms=["HS256"])
-    except JWTError:
-        raise HTTPException(status_code=400, detail="Invalid or expired invite token")
-        
-    email = payload.get("email")
-    firm_id_str = payload.get("firm_id")
-    role = payload.get("role")
+    result = await db.execute(select(Firm).where(Firm.one_time_admin_key_hash == admin_key_hash))
+    firm = result.scalar_one_or_none()
     
-    if not email or not firm_id_str:
-        raise HTTPException(status_code=400, detail="Invalid token payload")
+    if not firm:
+        raise HTTPException(status_code=400, detail="Invalid or expired admin key")
         
-    import uuid
-    firm_id = uuid.UUID(firm_id_str)
+    user_result = await db.execute(select(User).where(User.email == data.email))
+    if user_result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="User already exists")
+        
+    user = User(
+        email=data.email,
+        hashed_password=get_password_hash(data.password),
+        icai_membership_number=data.icai_membership_number
+    )
+    db.add(user)
+    await db.flush()
     
-    invite_result = await db.execute(select(Invite).where(Invite.token == data.token, Invite.status == "pending"))
-    invite = invite_result.scalar_one_or_none()
-    if not invite:
-        raise HTTPException(status_code=400, detail="Invite not found or already accepted")
-        
-    user_result = await db.execute(select(User).where(User.email == email))
-    user = user_result.scalar_one_or_none()
+    mapping = UserFirmMapping(
+        user_id=user.id,
+        firm_id=firm.id,
+        role="Admin/Owner",
+        status="active"
+    )
+    db.add(mapping)
     
-    if user:
-        mapping = UserFirmMapping(user_id=user.id, firm_id=firm_id, role=role)
-        db.add(mapping)
-    else:
-        if not data.password:
-            raise HTTPException(status_code=400, detail="Password is required for new users")
-            
-        user = User(
-            email=email,
-            hashed_password=get_password_hash(data.password),
-            icai_membership_number=data.icai_membership_number
-        )
-        db.add(user)
-        await db.flush()
-        
-        mapping = UserFirmMapping(user_id=user.id, firm_id=firm_id, role=role)
-        db.add(mapping)
-        
-    invite.status = "accepted"
+    firm.one_time_admin_key_hash = None
     await db.commit()
     
-    return create_response(data={"message": "Invite accepted successfully"})
+    access_token = create_access_token(subject=str(user.id), firm_id=str(firm.id))
+    return create_response(data={"access_token": access_token, "token_type": "bearer", "user": {"id": str(user.id), "email": user.email}})
+
+
+@router.post("/signup")
+async def signup_user(data: SignupRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == data.email))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email already registered")
+        
+    user = User(
+        email=data.email,
+        hashed_password=get_password_hash(data.password),
+        icai_membership_number=data.icai_membership_number
+    )
+    db.add(user)
+    await db.commit()
+    
+    access_token = create_access_token(subject=str(user.id), firm_id="")
+    return create_response(data={"access_token": access_token, "token_type": "bearer", "user": {"id": str(user.id), "email": user.email}})
+
+
+@router.post("/join-firm")
+async def join_firm(
+    data: JoinFirmRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    import hashlib
+    firm_key_hash = hashlib.sha256(data.firm_key.encode()).hexdigest()
+    
+    result = await db.execute(select(Firm).where(Firm.firm_key_hash == firm_key_hash))
+    firm = result.scalar_one_or_none()
+    
+    if not firm:
+        raise HTTPException(status_code=400, detail="Invalid firm key")
+        
+    existing = await db.execute(select(UserFirmMapping).where(UserFirmMapping.user_id == current_user.id, UserFirmMapping.firm_id == firm.id))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Already requested to join this firm")
+        
+    mapping = UserFirmMapping(
+        user_id=current_user.id,
+        firm_id=firm.id,
+        role=data.assigned_role,
+        status="pending_approval"
+    )
+    db.add(mapping)
+    await db.commit()
+    
+    return create_response(data={"message": "Join request submitted. Pending admin approval."})
+
+
+@router.get("/pending-approvals")
+async def get_pending_approvals(
+    db: AsyncSession = Depends(get_db),
+    current_firm: Firm = Depends(get_current_firm)
+):
+    result = await db.execute(
+        select(UserFirmMapping, User)
+        .join(User)
+        .where(UserFirmMapping.firm_id == current_firm.id, UserFirmMapping.status == "pending_approval")
+    )
+    approvals = []
+    for mapping, user in result.all():
+        approvals.append({
+            "mapping_id": str(mapping.id),
+            "user_id": str(user.id),
+            "email": user.email,
+            "role": mapping.role,
+            "icai_number": user.icai_membership_number
+        })
+    return create_response(data=approvals)
+
+
+@router.patch("/approve-user")
+async def approve_user(
+    data: ApproveUserRequest,
+    db: AsyncSession = Depends(get_db),
+    current_firm: Firm = Depends(get_current_firm),
+    current_user: User = Depends(get_current_user)
+):
+    admin_check = await db.execute(
+        select(UserFirmMapping).where(UserFirmMapping.user_id == current_user.id, UserFirmMapping.firm_id == current_firm.id)
+    )
+    admin_map = admin_check.scalar_one_or_none()
+    if not admin_map or admin_map.role != "Admin/Owner":
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    import uuid
+    result = await db.execute(
+        select(UserFirmMapping)
+        .where(UserFirmMapping.user_id == uuid.UUID(data.user_id), UserFirmMapping.firm_id == current_firm.id)
+    )
+    mapping = result.scalar_one_or_none()
+    
+    if not mapping:
+        raise HTTPException(status_code=404, detail="Mapping not found")
+        
+    if data.action == "approve":
+        mapping.status = "active"
+        user_res = await db.execute(select(User).where(User.id == mapping.user_id))
+        target_user = user_res.scalar_one_or_none()
+        if target_user:
+            import logging
+            logging.getLogger(__name__).info(f"EMAIL TO {target_user.email}: You have been verified by the firm. Login here: https://app.yourdomain.com/")
+    elif data.action == "reject":
+        await db.delete(mapping)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action")
+        
+    await db.commit()
+    return create_response(data={"message": f"User {data.action}d successfully"})

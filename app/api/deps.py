@@ -49,8 +49,8 @@ async def get_current_user(
             )
         )
         mapping = mapping_result.scalar_one_or_none()
-        if not mapping:
-            raise HTTPException(status_code=403, detail="Not authorized for this firm")
+        if not mapping or mapping.status != "active":
+            raise HTTPException(status_code=403, detail="Not authorized or pending approval for this firm")
             
         user.active_firm_id = UUID(firm_id)
         user.active_role = mapping.role

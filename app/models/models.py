@@ -21,6 +21,8 @@ class Firm(Base):
     name = Column(String, nullable=False)
     gstin = Column(String)
     plan = Column(String, default="standard")
+    firm_key_hash = Column(String, unique=True, nullable=True) # made nullable temporarily for existing data
+    one_time_admin_key_hash = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user_mappings = relationship("UserFirmMapping", back_populates="firm")
@@ -43,6 +45,7 @@ class UserFirmMapping(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     firm_id = Column(UUID(as_uuid=True), ForeignKey("firms.id"), nullable=False)
     role = Column(String, nullable=False) # admin, partner, staff, article_clerk
+    status = Column(String, default="pending_approval") # pending_approval, active, revoked
 
     user = relationship("User", back_populates="firm_mappings")
     firm = relationship("Firm", back_populates="user_mappings")

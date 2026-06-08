@@ -46,11 +46,21 @@ class AdminOTPVerify(BaseModel):
     email: EmailStr
     otp: str
 
-class InviteRequest(BaseModel):
+class AdminActivateRequest(BaseModel):
+    admin_key: str
     email: EmailStr
-    role: str
+    password: str
+    icai_membership_number: str | None = None
 
-class AcceptInviteRequest(BaseModel):
-    token: str
-    password: str | None = None
+class JoinFirmRequest(BaseModel):
+    firm_key: str
+    assigned_role: str
+
+class ApproveUserRequest(BaseModel):
+    user_id: str
+    action: str # "approve" | "reject"
+
+class SignupRequest(BaseModel):
+    email: EmailStr
+    password: str
     icai_membership_number: str | None = None

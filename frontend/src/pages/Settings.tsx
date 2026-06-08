@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ServerCog, UserPlus, CheckCircle2, AlertCircle, Trash2, Mail, Building2, Shield, Database } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -24,6 +24,8 @@ const team = [
 export default function Settings() {
   const [ollamaStatus, setOllamaStatus] = useState<"idle" | "testing" | "ok" | "error">("ok");
   const [activeTab, setActiveTab] = useState("firm");
+  const [teamTab, setTeamTab] = useState("current");
+  const queryClient = useQueryClient();
 
   const { data: meData, isLoading } = useQuery({
     queryKey: ["me"],
@@ -35,6 +37,37 @@ export default function Settings() {
       return res.json().then(d => d.data);
     }
   });
+
+  const { data: pendingApprovals } = useQuery({
+    queryKey: ["pending-approvals"],
+    queryFn: async () => {
+      const res = await fetch("/api/v1/auth/pending-approvals", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json().then(d => d.data);
+    }
+  });
+
+  const handleApprove = async (userId: string, action: "approve" | "reject") => {
+    try {
+      const res = await fetch("/api/v1/auth/approve-user", {
+        method: "PATCH",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("access_token")}`
+        },
+        body: JSON.stringify({ user_id: userId, action })
+      });
+      if (!res.ok) throw new Error("Action failed");
+      toast.success(`User ${action}d successfully`);
+      queryClient.invalidateQueries({ queryKey: ["pending-approvals"] });
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const hasPending = pendingApprovals && pendingApprovals.length > 0;
 
   const firmName = meData?.firm?.name || "Mehta & Co. Chartered Accountants";
   const contactEmail = meData?.user?.email || "contact@mehtaco.in";
@@ -74,6 +107,12 @@ export default function Settings() {
                 )}
                 <span className="relative z-10 flex items-center">
                   <tab.icon className="mr-1.5 h-3.5 w-3.5" /> {tab.label}
+                  {tab.id === "team" && hasPending && (
+                    <span className="absolute -top-1 -right-2 flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-75"></span>
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-destructive"></span>
+                    </span>
+                  )}
                 </span>
               </TabsTrigger>
             ))}
@@ -95,42 +134,78 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="team" className="space-y-4">
-            <Card className="border-border/70 bg-card shadow-elegant">
-              <div className="flex items-center justify-between border-b border-border/60 p-5">
-                <div>
-                  <h3 className="font-display text-base font-bold">Team members</h3>
-                  <p className="text-xs text-muted-foreground">{team.length} people in this workspace</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Input placeholder="email@firm.in" className="h-9 w-56" />
-                  <Button onClick={() => toast.success("Invite sent")} className="gap-2 bg-gradient-primary text-primary-foreground hover:opacity-95">
-                    <Mail className="h-4 w-4" /> Send invite
-                  </Button>
-                </div>
-              </div>
-              <div className="divide-y divide-border/60">
-                {team.map((m) => (
-                  <div key={m.email} className="flex items-center gap-4 px-5 py-3.5">
-                    <Avatar className="h-10 w-10 border border-border">
-                      <AvatarFallback className="bg-gradient-primary text-xs font-bold text-primary-foreground">{m.initials}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">{m.name}</p>
-                      <p className="text-xs text-muted-foreground">{m.email}</p>
-                    </div>
-                    <Badge variant="outline" className="border-border bg-muted/40 text-[10px] font-bold uppercase tracking-wider">{m.role}</Badge>
-                    {m.status === "invited" ? (
-                      <Badge variant="outline" className="border-warning/30 bg-warning/10 text-[10px] font-bold uppercase tracking-wider text-warning">Invited</Badge>
-                    ) : (
-                      <span className="inline-flex h-2 w-2 rounded-full bg-success" title="Active" />
-                    )}
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
+            <div className="flex items-center gap-4 border-b border-border/60 pb-4">
+              <button onClick={() => setTeamTab("current")} className={`text-sm font-semibold transition-colors ${teamTab === "current" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}>Current Team</button>
+              <button onClick={() => setTeamTab("approvals")} className={`text-sm font-semibold transition-colors relative ${teamTab === "approvals" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+                Invite Approvals
+                {hasPending && <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">{pendingApprovals.length}</span>}
+              </button>
+            </div>
+
+            {teamTab === "current" && (
+              <Card className="border-border/70 bg-card shadow-elegant animate-in fade-in slide-in-from-bottom-2">
+                <div className="flex items-center justify-between border-b border-border/60 p-5">
+                  <div>
+                    <h3 className="font-display text-base font-bold">Team members</h3>
+                    <p className="text-xs text-muted-foreground">{team.length} people in this workspace</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input placeholder="email@firm.in" className="h-9 w-56" />
+                    <Button onClick={() => toast.success("Invite sent")} className="gap-2 bg-gradient-primary text-primary-foreground hover:opacity-95">
+                      <Mail className="h-4 w-4" /> Send invite
                     </Button>
                   </div>
-                ))}
-              </div>
-            </Card>
+                </div>
+                <div className="divide-y divide-border/60">
+                  {team.map((m) => (
+                    <div key={m.email} className="flex items-center gap-4 px-5 py-3.5">
+                      <Avatar className="h-10 w-10 border border-border">
+                        <AvatarFallback className="bg-gradient-primary text-xs font-bold text-primary-foreground">{m.initials}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold">{m.name}</p>
+                        <p className="text-xs text-muted-foreground">{m.email}</p>
+                      </div>
+                      <Badge variant="outline" className="border-border bg-muted/40 text-[10px] font-bold uppercase tracking-wider">{m.role}</Badge>
+                      <span className="inline-flex h-2 w-2 rounded-full bg-success" title="Active" />
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {teamTab === "approvals" && (
+              <Card className="border-border/70 bg-card shadow-elegant animate-in fade-in slide-in-from-bottom-2">
+                <div className="p-5 border-b border-border/60">
+                  <h3 className="font-display text-base font-bold">Pending Approvals</h3>
+                  <p className="text-xs text-muted-foreground">Users who used your Firm Key to join.</p>
+                </div>
+                {!hasPending ? (
+                  <div className="p-10 text-center text-muted-foreground text-sm">No pending approvals</div>
+                ) : (
+                  <div className="divide-y divide-border/60">
+                    {pendingApprovals.map((req: any) => (
+                      <div key={req.user_id} className="flex items-center gap-4 px-5 py-4 hover:bg-muted/30 transition-colors cursor-pointer group">
+                        <Avatar className="h-10 w-10 border border-border">
+                          <AvatarFallback className="bg-gradient-primary text-xs font-bold text-primary-foreground">{req.email.substring(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold">{req.email}</p>
+                          <p className="text-xs text-muted-foreground">Requested Role: <span className="font-medium">{req.role}</span> {req.icai_number ? `· ICAI: ${req.icai_number}` : ""}</p>
+                        </div>
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button size="sm" variant="outline" className="h-8 text-xs text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleApprove(req.user_id, "reject"); }}>Reject</Button>
+                          <Button size="sm" className="h-8 text-xs bg-success text-success-foreground hover:bg-success/90" onClick={(e) => { e.stopPropagation(); handleApprove(req.user_id, "approve"); }}>Approve</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="ai" className="space-y-4">
