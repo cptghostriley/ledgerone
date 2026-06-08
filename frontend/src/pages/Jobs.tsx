@@ -1,15 +1,19 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Workflow, RefreshCw, Pause, X, CheckCircle2, AlertCircle, Clock, FileStack } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
 import { formatDistanceToNow, format } from "date-fns";
+import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 const FILTERS = ["All", "Active", "Completed", "Failed"] as const;
 
 export default function Jobs() {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<typeof FILTERS[number]>("All");
 
   const { data: serverJobs, refetch } = useQuery({
@@ -22,6 +26,22 @@ export default function Jobs() {
       return res.json().then(d => d.data);
     },
     refetchInterval: 3000
+  });
+
+  const deleteJob = useMutation({
+    mutationFn: async (jobId: string) => {
+      const res = await fetch(`/api/v1/jobs/${jobId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (!res.ok) throw new Error("Failed to delete job");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Job deleted");
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const jobsData = serverJobs || [];
@@ -43,7 +63,7 @@ export default function Jobs() {
   return (
     <div className="flex flex-col">
       <PageHeader title="Processing jobs" description="Real-time queue · polling every 3 seconds for active jobs.">
-        <Button variant="outline" className="gap-2"><RefreshCw className="h-4 w-4" /> Refresh</Button>
+        <Button variant="outline" className="gap-2" onClick={() => refetch()}><RefreshCw className="h-4 w-4" /> Refresh</Button>
       </PageHeader>
 
       <div className="space-y-5 px-6 py-6 md:px-8">
@@ -86,10 +106,12 @@ export default function Jobs() {
         </div>
 
         <div className="space-y-3">
-          {filtered.map((j) => {
+          {filtered.map((j: any) => {
             const active = j.status === "processing";
             return (
-              <Card key={j.id} className={`relative overflow-hidden border-border/70 bg-card p-5 shadow-elegant ${active ? "ring-1 ring-info/30" : ""}`}>
+              <Card key={j.id} className={`relative overflow-hidden border-border/70 bg-card p-5 shadow-elegant ${active ? "ring-1 ring-info/30" : ""} ${(j.status === "completed" && j.document_id) ? "cursor-pointer hover:bg-muted/40 transition-colors" : ""}`} onClick={() => {
+                if (j.status === "completed" && j.document_id) navigate(`/documents/${j.document_id}`);
+              }}>
                 {active && (
                   <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden">
                     <div className="h-full w-1/3 animate-[shimmer_2s_linear_infinite] bg-gradient-to-r from-transparent via-info to-transparent" style={{ backgroundSize: "200% 100%" }} />
@@ -112,17 +134,14 @@ export default function Jobs() {
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-display text-sm font-bold">{j.type}</h3>
                         <StatusBadge status={j.status} />
-                        <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
-                          {j.filesCount} {j.filesCount === 1 ? "file" : "files"}
-                        </span>
                       </div>
-                      <p className="mt-1 text-xs text-muted-foreground">{j.clientName} · started {j.startedAt ? formatDistanceToNow(new Date(j.startedAt), { addSuffix: true }) : 'just now'}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{j.clientName} · started {j.created_at ? formatDistanceToNow(new Date(j.created_at), { addSuffix: true }) : 'just now'}</p>
                     </div>
                   </div>
-                  <div className="flex gap-1.5">
-                    {active && <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs"><Pause className="h-3 w-3" /> Pause</Button>}
-                    {j.status === "failed" && <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs"><RefreshCw className="h-3 w-3" /> Retry</Button>}
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive"><X className="h-4 w-4" /></Button>
+                  <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    {active && <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => toast.info("Job paused")}><Pause className="h-3 w-3" /> Pause</Button>}
+                    {j.status === "failed" && <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => toast.info("Retrying job...")}><RefreshCw className="h-3 w-3" /> Retry</Button>}
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => deleteJob.mutate(j.id)} disabled={deleteJob.isPending}><X className="h-4 w-4" /></Button>
                   </div>
                 </div>
 

@@ -47,9 +47,11 @@ async def call_ollama(prompt: str, image_path: str = None) -> str:
         "model": settings.ollama_model,
         "prompt": prompt,
         "stream": False,
+        "format": "json",
         "options": {
             "temperature": 0.1,
-            "num_predict": 2048,
+            "num_predict": 1024,
+            "num_ctx": 4096,
         }
     }
 
@@ -110,8 +112,8 @@ async def extract_data(document_id: str, firm_id: str, pages: list) -> list:
         if page_type == "image" and image_path:
             prompt = EXTRACTION_PROMPT.format(text="[Image document - analyze visually]")
         else:
-            # Truncate to avoid token limits
-            truncated = text[:6000] if len(text) > 6000 else text
+            # Shorten truncation to 4000 chars (safe context for gemma4)
+            truncated = text[:4000] if len(text) > 4000 else text
             prompt = EXTRACTION_PROMPT.format(text=truncated)
 
         try:

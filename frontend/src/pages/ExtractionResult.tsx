@@ -1,15 +1,18 @@
 import { useParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, FileText, CheckCircle2, AlertTriangle, Clock, Loader2,
-  Sparkles, ChevronRight, BarChart3, Calendar, Building2, Hash, UploadCloud
+  Sparkles, ChevronRight, BarChart3, Calendar, Building2, Hash, UploadCloud, Plus, Save, Trash2
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { useState, useEffect } from "react";
 
 const authHeader = () => ({
+  "Content-Type": "application/json",
   Authorization: `Bearer ${localStorage.getItem("access_token")}`,
 });
 
@@ -34,35 +37,99 @@ function ConfidenceBar({ value }: { value: number | null }) {
   );
 }
 
-function FieldRow({ label, value }: { label: string; value: any }) {
+interface FieldRowProps {
+  label: string;
+  value: any;
+  onPromote?: () => void;
+  onRemove?: () => void;
+  isMain?: boolean;
+}
+
+function FieldRow({ label, value, onPromote, onRemove, isMain }: FieldRowProps) {
   if (value === null || value === undefined || value === "") return null;
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-border/40 py-2.5 last:border-0">
+    <div className="group flex items-start justify-between gap-4 border-b border-border/40 py-2.5 last:border-0 hover:bg-muted/30 px-2 -mx-2 rounded-md transition-colors">
       <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground min-w-[140px]">
         {label.replace(/_/g, " ")}
       </span>
-      <span className="text-sm text-right font-medium break-all">
-        {typeof value === "object" ? JSON.stringify(value) : String(value)}
-      </span>
+      <div className="flex flex-1 items-center justify-end gap-3 overflow-hidden">
+        <span className="text-sm font-medium truncate">
+          {typeof value === "object" ? JSON.stringify(value) : String(value)}
+        </span>
+        
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          {onPromote && (
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
+              onClick={onPromote}
+              title="Add to main results"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          {onRemove && (
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={onRemove}
+              title="Remove field"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
 export default function ExtractionResult() {
   const { documentId } = useParams<{ documentId: string }>();
+  const queryClient = useQueryClient();
+  const [localExtracted, setLocalExtracted] = useState<any>(null);
+  const [hasChanges, setHasChanges] = useState(false);
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["document", documentId],
     queryFn: async () => {
       const res = await fetch(`/api/v1/documents/${documentId}`, { headers: authHeader() });
       if (!res.ok) throw new Error("Document not found");
-      return res.json().then(d => d.data);
+      const d = await res.json();
+      return d.data;
     },
-    // Auto-refresh while processing
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return status === "pending" || status === "processing" ? 3000 : false;
     },
+  });
+
+  useEffect(() => {
+    if (data && data.extractedData && !localExtracted) {
+      setLocalExtracted(data.extractedData);
+    }
+  }, [data]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (updates: any) => {
+      const res = await fetch(`/api/v1/documents/${documentId}`, {
+        method: "PATCH",
+        headers: authHeader(),
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error("Update failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Extraction results updated");
+      setHasChanges(false);
+      queryClient.invalidateQueries({ queryKey: ["document", documentId] });
+    },
+    onError: (err) => {
+      toast.error(`Error: ${err.message}`);
+    }
   });
 
   if (isLoading) {
@@ -84,12 +151,40 @@ export default function ExtractionResult() {
     );
   }
 
-  const extracted = data.extractedData || {};
+  const extracted = localExtracted || data.extractedData || {};
   const anomalies: any[] = Array.isArray(data.anomalies) ? data.anomalies : [];
   const keyFields = extracted.key_fields || {};
   const lineItems: any[] = extracted.line_items || [];
   const dates: string[] = extracted.dates || [];
   const isPending = data.status === "pending" || data.status === "processing";
+
+  // Core fields we always want in the primary view
+  const coreKeys = ["document_type", "entity_name", "financial_year", "pan", "gstin", "total_amount", "tax_amount", "summary"];
+  
+  const handlePromote = (key: string, value: any) => {
+    const updated = { ...extracted };
+    updated[key] = value;
+    if (updated.key_fields) {
+      delete updated.key_fields[key];
+    }
+    setLocalExtracted(updated);
+    setHasChanges(true);
+  };
+
+  const handleRemove = (key: string, isKeyField: boolean) => {
+    const updated = { ...extracted };
+    if (isKeyField) {
+      if (updated.key_fields) delete updated.key_fields[key];
+    } else {
+      delete updated[key];
+    }
+    setLocalExtracted(updated);
+    setHasChanges(true);
+  };
+
+  const handleSave = () => {
+    updateMutation.mutate({ extractedData: extracted });
+  };
 
   return (
     <div className="flex flex-col">
@@ -97,7 +192,12 @@ export default function ExtractionResult() {
         title={data.filename || "Extraction Result"}
         description={data.summary || "AI-extracted document data"}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {hasChanges && (
+            <Button onClick={handleSave} className="gap-2 shadow-glow animate-in fade-in zoom-in duration-300">
+              <Save className="h-4 w-4" /> Save Changes
+            </Button>
+          )}
           <Button asChild variant="outline" className="gap-2">
             <Link to={`/clients/${data.clientId || ""}`}><ArrowLeft className="h-4 w-4" /> Back to client</Link>
           </Button>
@@ -123,17 +223,6 @@ export default function ExtractionResult() {
               <FileText className="h-3.5 w-3.5" />
               {data.mimeType || "document"}
             </div>
-
-            {data.financialYear && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Calendar className="h-3.5 w-3.5" />
-                FY {data.financialYear}
-              </div>
-            )}
-
-            {data.docType && (
-              <Badge variant="outline" className="text-xs font-mono">{data.docType}</Badge>
-            )}
 
             <div className="ml-auto flex items-center gap-4">
               <div>
@@ -180,11 +269,11 @@ export default function ExtractionResult() {
         )}
 
         <div className="grid gap-5 lg:grid-cols-2">
-          {/* Core fields */}
+          {/* Main Extraction Results */}
           <Card className="border-border/70 bg-card p-5 shadow-elegant">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="h-4 w-4 text-primary" />
-              <h3 className="font-display text-sm font-bold">Extracted Core Fields</h3>
+              <h3 className="font-display text-sm font-bold">Main Extraction Result</h3>
             </div>
             {!isPending && Object.keys(extracted).length === 0 && (
               <p className="text-sm text-muted-foreground">No data extracted yet.</p>
@@ -198,21 +287,43 @@ export default function ExtractionResult() {
               <FieldRow label="Total Amount" value={extracted.total_amount != null ? `₹ ${Number(extracted.total_amount).toLocaleString("en-IN")}` : null} />
               <FieldRow label="Tax Amount" value={extracted.tax_amount != null ? `₹ ${Number(extracted.tax_amount).toLocaleString("en-IN")}` : null} />
               <FieldRow label="Summary" value={extracted.summary} />
+              
+              {/* Show promoted fields (fields that aren't core but are at root) */}
+              {Object.entries(extracted).map(([k, v]) => {
+                if (coreKeys.includes(k) || k === "key_fields" || k === "line_items" || k === "dates" || k === "raw_response") return null;
+                return (
+                  <FieldRow 
+                    key={k} 
+                    label={k} 
+                    value={v as any} 
+                    onRemove={() => handleRemove(k, false)} 
+                  />
+                );
+              })}
             </div>
           </Card>
 
-          {/* Key fields */}
+          {/* AI Discoveries / Additional Fields */}
           <Card className="border-border/70 bg-card p-5 shadow-elegant">
             <div className="flex items-center gap-2 mb-4">
               <Hash className="h-4 w-4 text-primary" />
-              <h3 className="font-display text-sm font-bold">Additional Fields</h3>
+              <h3 className="font-display text-sm font-bold">AI Discoveries</h3>
             </div>
             {Object.keys(keyFields).length === 0 && dates.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No additional fields found.</p>
+              <p className="text-sm text-muted-foreground">No additional fields discovered.</p>
             ) : (
               <>
+                <p className="text-[11px] text-muted-foreground mb-4 italic">
+                  gemma4:e4b found these additional fields. Use the <Plus className="inline h-3 w-3" /> icon to add them to the main record.
+                </p>
                 {Object.entries(keyFields).map(([k, v]) => (
-                  <FieldRow key={k} label={k} value={v as any} />
+                  <FieldRow 
+                    key={k} 
+                    label={k} 
+                    value={v as any} 
+                    onPromote={() => handlePromote(k, v)}
+                    onRemove={() => handleRemove(k, true)}
+                  />
                 ))}
                 {dates.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-border/40">

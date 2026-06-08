@@ -63,3 +63,20 @@ async def get_job(
         "created_at": job.created_at.isoformat() if job.created_at else None,
         "completed_at": job.completed_at.isoformat() if job.completed_at else None,
     })
+
+@router.delete("/{job_id}")
+async def delete_job(
+    job_id: UUID,
+    firm: Firm = Depends(get_current_firm),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Job).where(Job.id == job_id, Job.firm_id == firm.id)
+    )
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    await db.delete(job)
+    await db.commit()
+    return create_response(data={"message": "Job deleted successfully"})

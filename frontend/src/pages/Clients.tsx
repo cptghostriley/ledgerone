@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Search, Plus, Filter, ArrowUpDown, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
@@ -28,6 +28,7 @@ function initials(name: string) {
 
 export default function Clients() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<typeof FILTERS[number]>("All");
   const [addOpen, setAddOpen] = useState(false);
@@ -248,10 +249,10 @@ export default function Clients() {
                   <TableRow
                     key={c.id}
                     className="group cursor-pointer border-border/40 transition-colors hover:bg-muted/40"
-                    onClick={() => (window.location.href = `/clients/${c.id}`)}
+                    onClick={() => navigate(`/clients/${c.id}`)}
                   >
                     <TableCell className="py-3.5">
-                      <Link to={`/clients/${c.id}`} className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10 border border-border">
                           <AvatarFallback className="bg-gradient-primary text-xs font-bold text-primary-foreground">
                             {initials(c.name)}
@@ -263,7 +264,7 @@ export default function Clients() {
                             {c.gstin && <span className="font-mono">{c.gstin}</span>}
                           </div>
                         </div>
-                      </Link>
+                      </div>
                     </TableCell>
                     <TableCell>
                       {c.filing_type && (

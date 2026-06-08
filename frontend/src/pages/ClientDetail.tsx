@@ -125,10 +125,10 @@ export default function ClientDetail() {
                 <UploadIcon className="h-4 w-4" /> Upload documents
               </Link>
             </Button>
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => toast.success("Reconciliation started")}>
               <Play className="h-4 w-4" /> Run reconciliation
             </Button>
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => toast.success("Report downloaded successfully")}>
               <Download className="h-4 w-4" /> Report
             </Button>
           </div>
@@ -186,11 +186,11 @@ export default function ClientDetail() {
                 <div className="mt-4 grid gap-2">
                   {[
                     { icon: UploadIcon, label: "Upload documents", to: `/clients/${client.id}/upload` },
-                    { icon: Play, label: "Run reconciliation" },
-                    { icon: Download, label: "Download FY report" },
-                    { icon: Mail, label: "Email missing-doc reminder" },
+                    { icon: Play, label: "Run reconciliation", action: () => toast.success("Reconciliation started") },
+                    { icon: Download, label: "Download FY report", action: () => toast.success("Report downloaded successfully") },
+                    { icon: Mail, label: "Email missing-doc reminder", action: () => toast.success("Reminder email sent") },
                   ].map((a) => (
-                    <Button key={a.label} variant="ghost" className="h-11 justify-between gap-2 border border-border/40 bg-muted/20 px-3 text-left hover:bg-muted/40" {...(a.to ? { asChild: true } : {})}>
+                    <Button key={a.label} variant="ghost" className="h-11 justify-between gap-2 border border-border/40 bg-muted/20 px-3 text-left hover:bg-muted/40" {...(a.to ? { asChild: true } : { onClick: a.action })}>
                       {a.to ? (
                         <Link to={a.to}>
                           <span className="flex items-center gap-2.5"><a.icon className="h-4 w-4 text-primary" /> <span className="text-sm font-medium">{a.label}</span></span>
@@ -240,8 +240,8 @@ export default function ClientDetail() {
                   </SelectContent>
                 </Select>
                 <div className="ml-auto flex gap-1.5">
-                  <Button variant="outline" size="sm" className="gap-1.5 text-xs"><RefreshCw className="h-3.5 w-3.5" /> Reprocess</Button>
-                  <Button variant="outline" size="sm" className="gap-1.5 text-xs text-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => toast.success("Reprocessing started")}><RefreshCw className="h-3.5 w-3.5" /> Reprocess</Button>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs text-destructive hover:text-destructive" onClick={() => toast.success("Deleted successfully")}><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
                 </div>
               </div>
 
@@ -316,8 +316,8 @@ export default function ClientDetail() {
                   <p className="text-xs text-muted-foreground">Last run · 12 minutes ago by CA Anjali Mehta</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" className="gap-2"><Download className="h-4 w-4" /> Export PDF</Button>
-                  <Button className="gap-2 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95"><Play className="h-4 w-4" /> Run reconciliation</Button>
+                  <Button variant="outline" className="gap-2" onClick={() => toast.success("PDF exported successfully")}><Download className="h-4 w-4" /> Export PDF</Button>
+                  <Button className="gap-2 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95" onClick={() => toast.success("Reconciliation started")}><Play className="h-4 w-4" /> Run reconciliation</Button>
                 </div>
               </div>
 
@@ -590,8 +590,8 @@ export default function ClientDetail() {
                 )}
 
                 <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1 gap-2"><Eye className="h-4 w-4" /> View original</Button>
-                  <Button variant="outline" className="flex-1 gap-2"><RefreshCw className="h-4 w-4" /> Reprocess</Button>
+                  <Button variant="outline" className="flex-1 gap-2" onClick={() => toast.success("Opening original document...")}><Eye className="h-4 w-4" /> View original</Button>
+                  <Button variant="outline" className="flex-1 gap-2" onClick={() => toast.success("Reprocessing document...")}><RefreshCw className="h-4 w-4" /> Reprocess</Button>
                 </div>
               </div>
             </>

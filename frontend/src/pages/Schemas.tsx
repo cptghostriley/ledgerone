@@ -62,12 +62,32 @@ export default function Schemas() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const openNewModal = () => {
+    setSchemaName("");
+    setDocType("");
+    setDescription("");
+    setFields([
+      { name: "gstin", type: "string", description: "15-character GST registration number" },
+      { name: "period", type: "date", description: "Return period (month/year)" },
+      { name: "total_taxable_value", type: "currency", description: "Aggregate taxable supply" },
+    ]);
+    setOpen(true);
+  };
+
+  const openEditModal = (schema: any) => {
+    setSchemaName(schema.name);
+    setDocType(schema.doc_type || "");
+    setDescription(schema.description || "");
+    setFields(schema.fields && schema.fields.length > 0 ? schema.fields : [{ name: "", type: "string", description: "" }]);
+    setOpen(true);
+  };
+
   return (
     <div className="flex flex-col">
       <PageHeader title="Extraction schemas" description="Define how AI should structure data from each document type your firm handles.">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95">
+            <Button className="gap-2 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95" onClick={(e) => { e.preventDefault(); openNewModal(); }}>
               <Plus className="h-4 w-4" /> New schema
             </Button>
           </DialogTrigger>
@@ -162,7 +182,7 @@ export default function Schemas() {
                   <p className="text-[11px] text-muted-foreground">{(s.fields ?? []).length} fields</p>
                 </div>
               </div>
-              <Button size="icon" variant="ghost" className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100">
+              <Button size="icon" variant="ghost" className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100" onClick={() => openEditModal(s)}>
                 <Edit3 className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -181,7 +201,7 @@ export default function Schemas() {
 
             <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3 text-[11px] text-muted-foreground">
               <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" /> Created {s.created_at ? formatDistanceToNow(new Date(s.created_at), { addSuffix: true }) : "recently"}</span>
-              <button className="inline-flex items-center gap-1 font-semibold text-primary hover:underline">Open <ArrowRight className="h-3 w-3" /></button>
+              <button className="inline-flex items-center gap-1 font-semibold text-primary hover:underline" onClick={() => openEditModal(s)}>Open <ArrowRight className="h-3 w-3" /></button>
             </div>
           </Card>
         ))}
