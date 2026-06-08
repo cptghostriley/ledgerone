@@ -46,14 +46,14 @@ const FILTERS: { key: "all" | string; label: string }[] = [
 
 const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem("access_token")}` });
 
-export default function Activity() {
+export default function FirmActivity() {
   const [filter, setFilter] = useState<string>("all");
   const [query, setQuery] = useState("");
 
   const { data: feed = [], isLoading } = useQuery<FeedItem[]>({
-    queryKey: ["activity-me"],
+    queryKey: ["activity-firm"],
     queryFn: async () => {
-      const res = await fetch("/api/v1/activity/me", { headers: authHeader() });
+      const res = await fetch("/api/v1/activity/firm", { headers: authHeader() });
       if (!res.ok) throw new Error("Failed to load activity");
       return res.json().then(d => d.data ?? []);
     },
@@ -98,8 +98,8 @@ export default function Activity() {
   return (
     <div className="flex flex-col">
       <PageHeader
-        title="Personal Activity stream"
-        description="A live audit trail of your uploads, AI insights, and pipeline jobs."
+        title="Firm Activity stream"
+        description="A live audit trail across all firm uploads, AI insights, reconciliations and pipeline jobs."
       >
         <Button variant="outline" className="gap-2">
           <Filter className="h-4 w-4" /> Filters

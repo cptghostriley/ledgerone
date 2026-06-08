@@ -14,6 +14,8 @@ import Schemas from "./pages/Schemas";
 import Jobs from "./pages/Jobs";
 import Settings from "./pages/Settings";
 import Activity from "./pages/Activity";
+import FirmActivity from "./pages/FirmActivity";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import ExtractionResult from "./pages/ExtractionResult";
 import { useEffect } from "react";
@@ -139,7 +141,9 @@ const App = () => (
                 <Route path="/schemas" element={<Schemas />} />
                 <Route path="/jobs" element={<Jobs />} />
                 <Route path="/activity" element={<Activity />} />
+                <Route path="/firm-activity" element={<FirmActivity />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/admin" element={<Admin />} />
                 <Route path="/documents/:documentId" element={<ExtractionResult />} />
               </Route>
             </Route>

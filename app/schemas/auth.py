@@ -64,3 +64,17 @@ class SignupRequest(BaseModel):
     email: EmailStr
     password: str
     icai_membership_number: str | None = None
+
+class InviteRequest(BaseModel):
+    email: EmailStr
+    role: str
+
+class AcceptInviteRequest(BaseModel):
+    token: str
+    password: str | None = None
+    icai_membership_number: str | None = None
+
+class UpdateMemberRequest(BaseModel):
+    user_id: str
+    action: str # "change_designation" | "disable_access"
+    role: str | None = None

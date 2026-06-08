@@ -17,6 +17,9 @@ import {
 import { Logo } from "@/components/logo";
 import { Badge } from "@/components/ui/badge";
 
+import { Shield, Database } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+
 const mainItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard, end: true },
   { title: "Clients", url: "/clients", icon: Users, badge: "10" },
@@ -24,15 +27,33 @@ const mainItems = [
   { title: "Jobs", url: "/jobs", icon: Workflow, badge: "3", badgeVariant: "primary" as const },
 ];
 
-const secondaryItems = [
+const userItems = [
   { title: "Activity", url: "/activity", icon: Activity },
   { title: "Settings", url: "/settings", icon: Settings },
+];
+
+const firmItems = [
+  { title: "Firm Activity", url: "/firm-activity", icon: Database },
+  { title: "Admin", url: "/admin", icon: Shield },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
+
+  const { data: meData } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/v1/auth/me", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json().then(d => d.data);
+    }
+  });
+
+  const isAdmin = meData?.active_role === "Admin/Owner";
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
@@ -119,12 +140,12 @@ export function AppSidebar() {
         <SidebarGroup>
           {!collapsed && (
             <SidebarGroupLabel className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45">
-              Firm
+              User
             </SidebarGroupLabel>
           )}
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
-              {secondaryItems.map((item) => {
+              {userItems.map((item) => {
                 const active = pathname.startsWith(item.url);
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -150,6 +171,48 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {isAdmin && (
+          <>
+            {!collapsed && <div className="wave-divider mx-3 my-5 opacity-60" />}
+            {collapsed && <div className="mx-auto my-4 h-px w-6 bg-sidebar-border/60" />}
+            
+            <SidebarGroup>
+              {!collapsed && (
+                <SidebarGroupLabel className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45">
+                  Firm
+                </SidebarGroupLabel>
+              )}
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  {firmItems.map((item) => {
+                    const active = pathname.startsWith(item.url);
+                    return (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={item.title}
+                          isActive={active}
+                          className={[
+                            "h-11 overflow-hidden rounded-xl transition-all",
+                            collapsed ? "!w-12 !p-0 justify-center mx-auto" : "px-3",
+                            "hover:bg-sidebar-accent/60",
+                            "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground",
+                          ].join(" ")}
+                        >
+                          <NavLink to={item.url}>
+                            <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+                            {!collapsed && <span className="text-[14px] font-medium">{item.title}</span>}
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
 
       <SidebarFooter className={`relative z-10 border-t border-sidebar-border/60 ${collapsed ? "p-2" : "p-3"}`}>
