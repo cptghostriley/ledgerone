@@ -23,10 +23,10 @@ class FirmCreate(BaseModel):
 
 class UserOut(BaseModel):
     id: UUID
-    firm_id: UUID
     email: EmailStr
-    role: str
     is_active: bool
+    active_firm_id: UUID | None = None
+    active_role: str | None = None
     
     class Config:
         from_attributes = True
@@ -45,3 +45,12 @@ class AdminOTPRequest(BaseModel):
 class AdminOTPVerify(BaseModel):
     email: EmailStr
     otp: str
+
+class InviteRequest(BaseModel):
+    email: EmailStr
+    role: str
+
+class AcceptInviteRequest(BaseModel):
+    token: str
+    password: str | None = None
+    icai_membership_number: str | None = None

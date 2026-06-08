@@ -23,20 +23,39 @@ class Firm(Base):
     plan = Column(String, default="standard")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    users = relationship("User", back_populates="firm")
+    user_mappings = relationship("UserFirmMapping", back_populates="firm")
     clients = relationship("Client", back_populates="firm")
 
 class User(Base):
     __tablename__ = "users"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    firm_id = Column(UUID(as_uuid=True), ForeignKey("firms.id"), nullable=False)
     email = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
-    role = Column(String, default="staff") # owner, manager, staff
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
+    icai_membership_number = Column(String, nullable=True)
 
-    firm = relationship("Firm", back_populates="users")
+    firm_mappings = relationship("UserFirmMapping", back_populates="user")
+
+class UserFirmMapping(Base):
+    __tablename__ = "user_firm_mappings"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    firm_id = Column(UUID(as_uuid=True), ForeignKey("firms.id"), nullable=False)
+    role = Column(String, nullable=False) # admin, partner, staff, article_clerk
+
+    user = relationship("User", back_populates="firm_mappings")
+    firm = relationship("Firm", back_populates="user_mappings")
+
+class Invite(Base):
+    __tablename__ = "invites"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firm_id = Column(UUID(as_uuid=True), ForeignKey("firms.id"), nullable=False)
+    email = Column(String, nullable=False)
+    token = Column(String, unique=True, nullable=False)
+    role = Column(String, nullable=False)
+    status = Column(String, default="pending") # pending/accepted/expired
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class Client(Base):
     __tablename__ = "clients"
