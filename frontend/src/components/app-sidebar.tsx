@@ -29,12 +29,12 @@ const mainItems = [
 
 const userItems = [
   { title: "Activity", url: "/activity", icon: Activity },
-  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 const firmItems = [
   { title: "Firm Activity", url: "/firm-activity", icon: Database },
   { title: "Admin", url: "/admin", icon: Shield },
+  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -176,7 +176,7 @@ export function AppSidebar() {
           <>
             {!collapsed && <div className="wave-divider mx-3 my-5 opacity-60" />}
             {collapsed && <div className="mx-auto my-4 h-px w-6 bg-sidebar-border/60" />}
-            
+
             <SidebarGroup>
               {!collapsed && (
                 <SidebarGroupLabel className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45">
