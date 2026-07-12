@@ -24,13 +24,21 @@ class Settings(BaseSettings):
     celery_workers: int = 1
     reconciliation_cache_ttl: int = 3600
     allowed_origins: str = "http://localhost:3000"
+    # S3 Object Storage settings
+    use_s3: bool = False
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_region: str = "ap-south-1"
+    s3_bucket_name: str = ""
     # SMTP / Mail settings
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 465
     smtp_user: str = "workstudiotwelve@gmail.com"
     smtp_password: str = ""
     admin_email: str = "workstudiotwelve@gmail.com"
+    vite_google_client_id: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
+

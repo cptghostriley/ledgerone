@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _run_pipeline_background(document_id: str, firm_id: str, job_id: str):
+async def _run_pipeline_background(document_id: str, firm_id: str, job_id: str, schema_id: str = None):
     """
     Inline pipeline runner used as a fallback when Celery is unavailable.
     Runs inside the FastAPI process as a background asyncio task.
@@ -27,7 +27,7 @@ async def _run_pipeline_background(document_id: str, firm_id: str, job_id: str):
     from app.models.models import Document as Doc
     try:
         await _update_job_status(job_id, "processing")
-        await run_pipeline(document_id, firm_id, job_id)
+        await run_pipeline(document_id, firm_id, job_id, schema_id)
         await _update_job_status(job_id, "completed", result={"document_id": document_id})
     except Exception as exc:
         logger.error(f"Inline pipeline failed: {exc}")
@@ -48,18 +48,34 @@ async def upload_document(
     firm: Firm = Depends(get_current_firm),
     db: AsyncSession = Depends(get_db),
 ):
-    storage_path = os.path.abspath(settings.storage_path)
-    os.makedirs(storage_path, exist_ok=True)
-
     file_ext = os.path.splitext(file.filename or "file")[1]
     safe_name = f"{uuid.uuid4()}{file_ext}"
-    file_path = os.path.join(storage_path, safe_name)
 
-    # Save physical file
+    # Save file to S3 or locally
     try:
         contents = await file.read()
-        with open(file_path, "wb") as buffer:
-            buffer.write(contents)
+        if settings.use_s3 and settings.s3_bucket_name:
+            import boto3
+            s3_client = boto3.client(
+                's3',
+                aws_access_key_id=settings.aws_access_key_id,
+                aws_secret_access_key=settings.aws_secret_access_key,
+                region_name=settings.aws_region
+            )
+            s3_key = f"documents/{firm.id}/{client_id}/{safe_name}"
+            s3_client.put_object(
+                Bucket=settings.s3_bucket_name,
+                Key=s3_key,
+                Body=contents,
+                ContentType=file.content_type
+            )
+            file_path = f"s3://{settings.s3_bucket_name}/{s3_key}"
+        else:
+            storage_path = os.path.abspath(settings.storage_path)
+            os.makedirs(storage_path, exist_ok=True)
+            file_path = os.path.join(storage_path, safe_name)
+            with open(file_path, "wb") as buffer:
+                buffer.write(contents)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to save file: {exc}")
 
@@ -98,7 +114,7 @@ async def upload_document(
     if not celery_dispatched:
         # Run the pipeline as a FastAPI background task (asyncio-based)
         background_tasks.add_task(
-            _run_pipeline_background, str(doc.id), str(firm.id), str(job.id)
+            _run_pipeline_background, str(doc.id), str(firm.id), str(job.id), schema_id
         )
 
     return create_response(data={"job_id": str(job.id), "document_id": str(doc.id)})
@@ -118,8 +134,12 @@ async def get_client_documents(
     for d in docs:
         size_bytes = 0
         try:
-            if d.file_path and os.path.exists(d.file_path):
-                size_bytes = os.path.getsize(d.file_path)
+            if d.file_path:
+                if d.file_path.startswith("s3://"):
+                    # We can't efficiently get S3 size here without a boto3 call for every file
+                    pass
+                elif os.path.exists(d.file_path):
+                    size_bytes = os.path.getsize(d.file_path)
         except Exception:
             pass
         out.append({
@@ -195,3 +215,69 @@ async def update_document(
 
     await db.commit()
     return create_response(data={"status": "success"})
+
+
+@router.post("/{document_id}/reprocess")
+async def reprocess_document(
+    document_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    firm: Firm = Depends(get_current_firm),
+    db: AsyncSession = Depends(get_db),
+):
+    # Check if document exists and belongs to firm
+    result = await db.execute(
+        select(Document).where(Document.id == document_id, Document.firm_id == firm.id)
+    )
+    doc = result.scalar_one_or_none()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Find the schema_id from the last job associated with this document
+    job_result = await db.execute(
+        select(Job)
+        .where(Job.firm_id == firm.id, Job.task_name == "process_document")
+        .order_by(Job.created_at.desc())
+    )
+    jobs = job_result.scalars().all()
+    schema_id = None
+    for j in jobs:
+        if j.payload and j.payload.get("document_id") == str(document_id):
+            schema_id = j.payload.get("schema_id")
+            break
+
+    # Reset document status and metadata
+    doc.status = "pending"
+    doc.doc_type = None
+    doc.confidence = None
+    doc.extracted_data = {}
+    doc.anomalies = []
+    doc.processing_ms = None
+    await db.flush()
+
+    # Create new Job record
+    job = Job(
+        firm_id=firm.id,
+        task_name="process_document",
+        status="pending",
+        payload={"document_id": str(doc.id), "schema_id": schema_id},
+    )
+    db.add(job)
+    await db.commit()
+
+    # Try Celery first; fall back to inline background task if unavailable
+    celery_dispatched = False
+    try:
+        from app.workers.tasks import process_document_task
+        process_document_task.delay(str(doc.id), str(firm.id), str(job.id), schema_id)
+        celery_dispatched = True
+        logger.info(f"Celery task dispatched for reprocessing doc {doc.id}")
+    except Exception as celery_err:
+        logger.warning(f"Celery unavailable ({celery_err}), falling back to inline pipeline for reprocessing")
+
+    if not celery_dispatched:
+        background_tasks.add_task(
+            _run_pipeline_background, str(doc.id), str(firm.id), str(job.id), schema_id
+        )
+
+    return create_response(data={"job_id": str(job.id), "document_id": str(doc.id)})
+

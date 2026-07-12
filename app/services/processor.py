@@ -8,6 +8,9 @@ import logging
 from app.core.database import AsyncSessionLocal
 from app.models.models import Document
 from uuid import UUID
+import boto3
+import tempfile
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +41,36 @@ async def preprocess_document(document_id: str, firm_id: str) -> list:
     """
     async with AsyncSessionLocal() as db:
         doc = await db.get(Document, UUID(document_id))
-        if not doc or not os.path.exists(doc.file_path):
-            logger.error(f"File not found: {doc.file_path if doc else 'no doc'}")
+        if not doc:
             return []
 
         file_path = doc.file_path
         doc_type = doc.doc_type or "document"
+
+    is_s3 = file_path and file_path.startswith("s3://")
+    if not is_s3 and (not file_path or not os.path.exists(file_path)):
+        logger.error(f"File not found: {file_path}")
+        return []
+
+    if is_s3:
+        from app.core.config import settings
+
+        parsed = urlparse(file_path)
+        bucket = parsed.netloc
+        key = parsed.path.lstrip('/')
+        
+        _, ext = os.path.splitext(key)
+        
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
+            region_name=settings.aws_region
+        )
+        fd, temp_file_path = tempfile.mkstemp(suffix=ext)
+        os.close(fd)
+        s3_client.download_file(bucket, key, temp_file_path)
+        file_path = temp_file_path
 
     pages = []
 
@@ -60,7 +87,10 @@ async def preprocess_document(document_id: str, firm_id: str) -> list:
                 else:
                     # Scanned page — send image bytes
                     pix = page.get_pixmap(dpi=150)
-                    pages.append({"page": page_num + 1, "image_path": file_path, "type": "image", "page_num": page_num})
+                    fd, pix_path = tempfile.mkstemp(suffix=".png")
+                    os.close(fd)
+                    pix.save(pix_path)
+                    pages.append({"page": page_num + 1, "image_path": pix_path, "type": "image", "page_num": page_num})
             pdf.close()
         except ImportError:
             # Fallback: read raw bytes as text attempt

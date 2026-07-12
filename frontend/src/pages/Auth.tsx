@@ -287,7 +287,10 @@ export default function Auth() {
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ token: credentialResponse.credential })
                           });
-                          if (!res.ok) throw new Error("Google Login failed");
+                          if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(err.detail || "Google Login failed");
+                          }
                           const json = await res.json();
                           localStorage.setItem("access_token", json.data.access_token);
                           toast.success("Login successful");

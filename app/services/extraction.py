@@ -5,6 +5,9 @@ Sends document text (or image) to Ollama and parses structured JSON output.
 import json
 import logging
 import httpx
+import base64
+import io
+from PIL import Image
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.models import Document, DocumentChunk
@@ -58,9 +61,13 @@ async def call_ollama(prompt: str, image_path: str = None) -> str:
     # Add image if it's a vision request
     if image_path:
         try:
-            import base64
-            with open(image_path, "rb") as f:
-                img_b64 = base64.b64encode(f.read()).decode()
+            with Image.open(image_path) as img:
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                img.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
+                buffer = io.BytesIO()
+                img.save(buffer, format="JPEG", quality=85)
+                img_b64 = base64.b64encode(buffer.getvalue()).decode()
             payload["images"] = [img_b64]
         except Exception as e:
             logger.warning(f"Could not encode image: {e}")
@@ -95,10 +102,21 @@ def parse_json_from_response(text: str) -> dict:
     return {"raw_response": text, "summary": text[:500]}
 
 
-async def extract_data(document_id: str, firm_id: str, pages: list) -> list:
+async def extract_data(document_id: str, firm_id: str, pages: list, schema_id: str = None) -> list:
     """
     For each page, send text/image to Ollama and collect extracted JSON chunks.
     """
+    schema_fields_str = ""
+    if schema_id:
+        from app.models.models import SchemaDef
+        async with AsyncSessionLocal() as db:
+            schema = await db.get(SchemaDef, UUID(schema_id))
+            if schema and schema.fields:
+                schema_fields_str = "    // You MUST extract these specific fields requested by the user. If not found, output 'Not found' for strings, or null for numbers:\n"
+                for f in schema.fields:
+                    schema_fields_str += f'    "{f.get("name")}": "{f.get("type")} - {f.get("description")}",\n'
+                schema_fields_str = schema_fields_str.replace("{", "{{").replace("}", "}}")
+
     results = []
     for page in pages:
         page_num = page.get("page", 1)
@@ -108,13 +126,17 @@ async def extract_data(document_id: str, firm_id: str, pages: list) -> list:
 
         if not text and not image_path:
             continue
+            
+        base_prompt = EXTRACTION_PROMPT
+        if schema_fields_str:
+            base_prompt = base_prompt.replace('"key_fields": {{', f'"key_fields": {{{{\n{schema_fields_str}')
 
         if page_type == "image" and image_path:
-            prompt = EXTRACTION_PROMPT.format(text="[Image document - analyze visually]")
+            prompt = base_prompt.format(text="[Image document - analyze visually]")
         else:
             # Shorten truncation to 4000 chars (safe context for gemma4)
             truncated = text[:4000] if len(text) > 4000 else text
-            prompt = EXTRACTION_PROMPT.format(text=truncated)
+            prompt = base_prompt.format(text=truncated)
 
         try:
             raw = await call_ollama(prompt, image_path if page_type == "image" else None)

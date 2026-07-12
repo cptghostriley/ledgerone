@@ -2,7 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, FileText, CheckCircle2, AlertTriangle, Clock, Loader2,
-  Sparkles, ChevronRight, BarChart3, Calendar, Building2, Hash, UploadCloud, Plus, Save, Trash2
+  Sparkles, ChevronRight, BarChart3, Calendar, Building2, Hash, UploadCloud, Plus, Save, Trash2, RefreshCw
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
@@ -52,8 +52,8 @@ function FieldRow({ label, value, onPromote, onRemove, isMain }: FieldRowProps) 
       <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground min-w-[140px]">
         {label.replace(/_/g, " ")}
       </span>
-      <div className="flex flex-1 items-center justify-end gap-3 overflow-hidden">
-        <span className="text-sm font-medium truncate">
+      <div className="flex flex-1 items-start justify-end gap-3">
+        <span className="text-sm font-medium whitespace-pre-wrap break-words text-right">
           {typeof value === "object" ? JSON.stringify(value) : String(value)}
         </span>
         
@@ -132,6 +132,25 @@ export default function ExtractionResult() {
     }
   });
 
+  const reprocessMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/v1/documents/${documentId}/reprocess`, {
+        method: "POST",
+        headers: authHeader(),
+      });
+      if (!res.ok) throw new Error("Reprocessing failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Extraction retried successfully");
+      setLocalExtracted(null);
+      queryClient.invalidateQueries({ queryKey: ["document", documentId] });
+    },
+    onError: (err) => {
+      toast.error(`Error retrying extraction: ${err.message}`);
+    }
+  });
+
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
@@ -198,6 +217,19 @@ export default function ExtractionResult() {
               <Save className="h-4 w-4" /> Save Changes
             </Button>
           )}
+          <Button
+            variant="outline"
+            className="gap-2 border-primary/30 text-primary hover:bg-primary/10"
+            onClick={() => reprocessMutation.mutate()}
+            disabled={isPending || reprocessMutation.isPending}
+          >
+            {reprocessMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Retry Extraction
+          </Button>
           <Button asChild variant="outline" className="gap-2">
             <Link to={`/clients/${data.clientId || ""}`}><ArrowLeft className="h-4 w-4" /> Back to client</Link>
           </Button>

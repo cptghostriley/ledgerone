@@ -81,13 +81,13 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
 
 @router.post("/google")
 async def google_login(data: GoogleLoginRequest, db: AsyncSession = Depends(get_db)):
-    import os
     from google.oauth2 import id_token
     from google.auth.transport import requests
+    from app.core.config import settings
 
     try:
-        client_id = os.environ.get("VITE_GOOGLE_CLIENT_ID", "")
-        idinfo = id_token.verify_oauth2_token(data.token, requests.Request())
+        client_id = settings.vite_google_client_id
+        idinfo = id_token.verify_oauth2_token(data.token, requests.Request(), audience=client_id)
 
         email = idinfo.get("email")
         if not email:
@@ -120,6 +120,7 @@ async def google_login(data: GoogleLoginRequest, db: AsyncSession = Depends(get_
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid Google token: {str(e)}")
+
 
 
 @router.get("/me")

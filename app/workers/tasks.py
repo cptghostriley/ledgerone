@@ -24,7 +24,7 @@ async def _update_job_status(job_id: str, status: str, result: dict = None, erro
                 job.completed_at = datetime.utcnow()
             await db.commit()
 
-async def run_pipeline(document_id: str, firm_id: str, job_id: str):
+async def run_pipeline(document_id: str, firm_id: str, job_id: str, schema_id: str = None):
     pipeline_start = time.time()
     
     # 1. Classify
@@ -44,7 +44,7 @@ async def run_pipeline(document_id: str, firm_id: str, job_id: str):
     # 3. Extract
     from app.services.extraction import extract_data
     start = time.time()
-    extracted_chunks = await extract_data(document_id, firm_id, pages_or_chunks)
+    extracted_chunks = await extract_data(document_id, firm_id, pages_or_chunks, schema_id)
     logger.info(f"Stage 3 (Extract) took {time.time() - start:.2f}s")
     
     # 4. Merge
@@ -94,7 +94,7 @@ def process_document_task(self, document_id: str, firm_id: str, job_id: str, sch
     async def _execute_all():
         try:
             await _update_job_status(job_id, "processing")
-            await run_pipeline(document_id, firm_id, job_id)
+            await run_pipeline(document_id, firm_id, job_id, schema_id)
             await _update_job_status(job_id, "completed", result={"document_id": document_id})
         except Exception as exc:
             logger.error(f"Pipeline failed: {exc}")
