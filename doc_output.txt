@@ -425,7 +425,7 @@ OLLAMA_BASE_URL
 http://localhost:11434
 Ollama API base URL
 OLLAMA_MODEL
-gemma4:e4b
+gemma4:e2b
 Model name for extraction and Q&A
 OLLAMA_EMBEDDING_MODEL
 nomic-embed-text
@@ -581,6 +581,6 @@ make test passes all tests
 Docker
 docker compose up -d starts all services without errors
 docker compose exec api alembic upgrade head runs clean
-docker compose exec ollama ollama pull gemma4:e4b downloads the model
+docker compose exec ollama ollama pull gemma4:e2b downloads the model
 All endpoints work identically in Docker vs local
 End of specification.

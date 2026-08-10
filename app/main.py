@@ -5,7 +5,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
 from app.core.middleware import firm_isolation_middleware
-from app.api.v1 import documents, auth, clients, jobs, dashboard, activity, schemas
+from app.api.v1 import documents, auth, clients, jobs, dashboard, activity, schemas, insights, qna, reconciliation
 from app.core.database import engine
 from app.models.models import Base
 
@@ -43,6 +43,9 @@ app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["jobs"])
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
 app.include_router(activity.router, prefix="/api/v1/activity", tags=["activity"])
 app.include_router(schemas.router, prefix="/api/v1/schemas", tags=["schemas"])
+app.include_router(insights.router, prefix="/api/v1/insights", tags=["insights"])
+app.include_router(qna.router, prefix="/api/v1/qna", tags=["qna"])
+app.include_router(reconciliation.router, prefix="/api/v1/recon", tags=["recon"])
 
 @app.get("/health")
 def health_check():

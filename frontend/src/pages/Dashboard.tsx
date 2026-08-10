@@ -7,9 +7,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { format, differenceInDays } from "date-fns";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
 
 const ICON_MAP: Record<string, any> = {
   AlertTriangle,
@@ -19,6 +21,8 @@ const ICON_MAP: Record<string, any> = {
 };
 
 export default function Dashboard() {
+  const [insight, setInsight] = useState<string | null>(null);
+
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: async () => {
@@ -29,6 +33,30 @@ export default function Dashboard() {
       return res.json().then(d => d.data);
     }
   });
+
+  const scanMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/v1/insights/scan", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (!res.ok) throw new Error("Failed to scan");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setInsight(data.insight);
+      localStorage.setItem("last_insight", data.insight);
+    }
+  });
+
+  useEffect(() => {
+    const saved = localStorage.getItem("last_insight");
+    if (saved) {
+      setInsight(saved);
+    } else {
+      scanMutation.mutate();
+    }
+  }, []);
 
   const STAT_DEFS = [
     { key: "clients", label: "Active clients", value: data?.clients ?? 0, delta: "Total active", icon: Users, tone: "primary" },
@@ -96,87 +124,86 @@ export default function Dashboard() {
             <div className="mb-4 flex items-start justify-between">
               <div>
                 <h2 className="font-display text-base font-bold">Document processing</h2>
-                <p className="text-xs text-muted-foreground">Last 6 months · across all clients</p>
+                <p className="text-xs text-muted-foreground">Last 6 months · volume across all clients</p>
               </div>
               <div className="flex items-center gap-3 text-[11px] font-medium">
-                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm border border-border/40 bg-[hsl(var(--info)/0.55)] backdrop-blur" /> Processed</span>
-                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm border border-border/40 bg-[hsl(var(--aurora-3)/0.5)] backdrop-blur" /> Review</span>
-                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm border border-border/40 bg-[hsl(var(--destructive)/0.5)] backdrop-blur" /> Failed</span>
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--info))]" /> Processed</span>
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--aurora-3))]" /> Review</span>
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--destructive))]" /> Failed</span>
               </div>
             </div>
             <div className="h-[280px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} barCategoryGap="28%" margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+                <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
                   <defs>
-                    <linearGradient id="glass-processed" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--info))" stopOpacity={0.85} />
-                      <stop offset="100%" stopColor="hsl(var(--info))" stopOpacity={0.25} />
+                    <linearGradient id="colorProcessed" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--info))" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(var(--info))" stopOpacity={0}/>
                     </linearGradient>
-                    <linearGradient id="glass-review" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--aurora-3))" stopOpacity={0.75} />
-                      <stop offset="100%" stopColor="hsl(var(--aurora-3))" stopOpacity={0.2} />
-                    </linearGradient>
-                    <linearGradient id="glass-failed" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.7} />
-                      <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.2} />
+                    <linearGradient id="colorReview" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--aurora-3))" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(var(--aurora-3))" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.5)" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.3)" vertical={false} />
                   <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip
-                    cursor={{ fill: "hsl(var(--muted) / 0.25)" }}
                     contentStyle={{
-                      background: "hsl(var(--popover) / 0.75)",
+                      background: "hsl(var(--popover) / 0.85)",
                       backdropFilter: "blur(14px)",
-                      WebkitBackdropFilter: "blur(14px)",
                       border: "1px solid hsl(var(--border) / 0.6)",
                       borderRadius: 12,
                       fontSize: 12,
                       boxShadow: "var(--shadow-lg)",
                     }}
                   />
-                  <Bar dataKey="processed" stackId="a" fill="url(#glass-processed)" stroke="hsl(var(--info) / 0.5)" strokeWidth={1} />
-                  <Bar dataKey="review" stackId="a" fill="url(#glass-review)" stroke="hsl(var(--aurora-3) / 0.45)" strokeWidth={1} />
-                  <Bar dataKey="failed" stackId="a" radius={[10, 10, 0, 0]} fill="url(#glass-failed)" stroke="hsl(var(--destructive) / 0.45)" strokeWidth={1} />
-                </BarChart>
+                  <Area type="monotone" dataKey="processed" stroke="hsl(var(--info))" strokeWidth={3} fillOpacity={1} fill="url(#colorProcessed)" />
+                  <Area type="monotone" dataKey="review" stroke="hsl(var(--aurora-3))" strokeWidth={3} fillOpacity={1} fill="url(#colorReview)" />
+                  <Area type="monotone" dataKey="failed" stroke="hsl(var(--destructive))" strokeWidth={2} fillOpacity={0.1} fill="hsl(var(--destructive))" />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </Card>
 
           {/* AI insights */}
-          <Card className="relative overflow-hidden border-border/70 bg-card p-5 shadow-elegant">
-            <div className="pointer-events-none absolute inset-0 bg-gradient-glow" />
-            <div className="relative">
-              <div className="flex items-center gap-2">
-                <div className="grid h-8 w-8 place-items-center rounded-md bg-gradient-primary">
-                  <Sparkles className="h-4 w-4 text-primary-foreground" />
+          <Card className="relative overflow-hidden border-border/70 bg-card p-5 shadow-elegant flex flex-col">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-glow opacity-50" />
+            <div className="relative flex-1 flex flex-col">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="grid h-8 w-8 place-items-center rounded-md bg-gradient-primary">
+                    <Sparkles className="h-4 w-4 text-primary-foreground" />
+                  </div>
+                  <h2 className="font-display text-base font-bold">AI insights</h2>
                 </div>
-                <h2 className="font-display text-base font-bold">AI insights</h2>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="h-7 text-xs px-2 gap-1"
+                  onClick={() => scanMutation.mutate()}
+                  disabled={scanMutation.isPending}
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {scanMutation.isPending ? "Scanning..." : "Re-scan"}
+                </Button>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Generated by Gemma 4:e4b · 4 mins ago
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Gemma 4:e2b analysis of your active clients
               </p>
 
-              <div className="mt-5 space-y-3">
-                {aiInsights.map((i: any) => {
-                  const Icon = ICON_MAP[i.icon] || Sparkles;
-                  return (
-                    <div key={i.title} className="flex gap-3 rounded-lg border border-border/60 bg-background/60 p-3 transition-colors hover:border-border">
-                      <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-md ${
-                        i.tone === "destructive" ? "bg-destructive/12 text-destructive" :
-                        i.tone === "warning" ? "bg-warning/12 text-warning" :
-                        "bg-info/12 text-info"
-                      }`}>
-                        <Icon className="h-3.5 w-3.5" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-[13px] font-semibold leading-snug">{i.title}</p>
-                        <p className="text-[11px] leading-snug text-muted-foreground">{i.desc}</p>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="mt-4 flex-1 rounded-lg border border-border/60 bg-background/40 p-4 text-sm leading-relaxed overflow-y-auto custom-scrollbar">
+                {insight ? (
+                  <div className="prose prose-sm prose-invert max-w-none">
+                    <ReactMarkdown>{insight}</ReactMarkdown>
+                  </div>
+                ) : scanMutation.isPending ? (
+                  <div className="flex h-full items-center justify-center text-muted-foreground">
+                    <span className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 animate-pulse" /> Scanning clients...
+                    </span>
+                  </div>
+                ) : null}
               </div>
             </div>
           </Card>

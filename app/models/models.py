@@ -71,6 +71,7 @@ class Client(Base):
     filing_type = Column(String)
     ay = Column(String)
     contact_info = Column(JSONB)
+    client_metadata = Column('metadata', JSONB)
 
     firm = relationship("Firm", back_populates="clients")
     documents = relationship("Document", back_populates="client")
@@ -159,6 +160,8 @@ class Job(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     completed_at = Column(DateTime)
 
+    user = relationship("User")
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -169,3 +172,70 @@ class AuditLog(Base):
     resource_id = Column(String)
     detail = Column(JSONB)
     ip = Column(String)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User")
+
+class ClientHistory(Base):
+    __tablename__ = "client_history"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    action = Column(String)
+    detail = Column(JSONB)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class QnASession(Base):
+    __tablename__ = "qna_sessions"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=True)
+    session_name = Column(String)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class QnAMessage(Base):
+    __tablename__ = "qna_messages"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id = Column(UUID(as_uuid=True), ForeignKey("qna_sessions.id"), nullable=False)
+    role = Column(String, nullable=False) # 'user' or 'ai'
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class BankTransaction(Base):
+    __tablename__ = "bank_transactions"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
+    date = Column(DateTime, nullable=False)
+    description = Column(String)
+    amount = Column(Float, nullable=False)
+    type = Column(String, nullable=False) # 'dr' or 'cr'
+    status = Column(String, default="unmatched") # unmatched, matched, queried
+
+class LedgerEntry(Base):
+    __tablename__ = "ledger_entries"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
+    date = Column(DateTime, nullable=False)
+    description = Column(String)
+    amount = Column(Float, nullable=False)
+    type = Column(String, nullable=False) # 'dr' or 'cr'
+    status = Column(String, default="unmatched")
+
+class ReconMatch(Base):
+    __tablename__ = "recon_matches"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    bank_txn_id = Column(UUID(as_uuid=True), ForeignKey("bank_transactions.id"), nullable=True)
+    ledger_entry_id = Column(UUID(as_uuid=True), ForeignKey("ledger_entries.id"), nullable=True)
+    match_tier = Column(String) # exact, fuzzy, multi, manual
+    confidence_score = Column(Float)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class ReconPeriodLock(Base):
+    __tablename__ = "recon_period_locks"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False)
+    month_year = Column(String, nullable=False) # format YYYY-MM
+    locked_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    locked_at = Column(DateTime, default=datetime.datetime.utcnow)
+    status = Column(String, default="locked")

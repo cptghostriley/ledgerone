@@ -9,8 +9,8 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.response import create_response
-from app.models.models import Document, Job, Firm
-from app.api.deps import get_current_firm
+from app.models.models import Document, Job, Firm, User, AuditLog
+from app.api.deps import get_current_firm, get_current_user
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,7 @@ async def upload_document(
     file: UploadFile = File(...),
     schema_id: str = Form(None),
     firm: Firm = Depends(get_current_firm),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     file_ext = os.path.splitext(file.filename or "file")[1]
@@ -94,11 +95,22 @@ async def upload_document(
     # Create Job record
     job = Job(
         firm_id=firm.id,
+        user_id=current_user.id,
         task_name="process_document",
         status="pending",
         payload={"document_id": str(doc.id), "schema_id": schema_id},
     )
     db.add(job)
+
+    # Create AuditLog record
+    audit = AuditLog(
+        firm_id=firm.id,
+        user_id=current_user.id,
+        action=f"Uploaded document '{file.filename}'",
+        resource_type="document",
+        resource_id=str(doc.id),
+    )
+    db.add(audit)
     await db.commit()
 
     # Try Celery first; fall back to inline background task if unavailable
@@ -191,6 +203,7 @@ async def update_document(
     document_id: uuid.UUID,
     updates: dict,
     firm: Firm = Depends(get_current_firm),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -213,8 +226,19 @@ async def update_document(
     if "status" in updates:
         doc.status = updates["status"]
 
+    # Create AuditLog record
+    audit = AuditLog(
+        firm_id=firm.id,
+        user_id=current_user.id,
+        action=f"Updated extraction details for document '{doc.original_filename}'",
+        resource_type="document",
+        resource_id=str(doc.id),
+    )
+    db.add(audit)
+
     await db.commit()
     return create_response(data={"status": "success"})
+
 
 
 @router.post("/{document_id}/reprocess")
@@ -222,6 +246,7 @@ async def reprocess_document(
     document_id: uuid.UUID,
     background_tasks: BackgroundTasks,
     firm: Firm = Depends(get_current_firm),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     # Check if document exists and belongs to firm
@@ -257,11 +282,22 @@ async def reprocess_document(
     # Create new Job record
     job = Job(
         firm_id=firm.id,
+        user_id=current_user.id,
         task_name="process_document",
         status="pending",
         payload={"document_id": str(doc.id), "schema_id": schema_id},
     )
     db.add(job)
+
+    # Create AuditLog record
+    audit = AuditLog(
+        firm_id=firm.id,
+        user_id=current_user.id,
+        action=f"Retried extraction for document '{doc.original_filename}'",
+        resource_type="document",
+        resource_id=str(doc.id),
+    )
+    db.add(audit)
     await db.commit()
 
     # Try Celery first; fall back to inline background task if unavailable

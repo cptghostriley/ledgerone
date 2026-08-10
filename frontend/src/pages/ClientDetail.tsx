@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState, useRef, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link, Navigate } from "react-router-dom";
 import {
   Upload as UploadIcon, FileCheck2, Download, Play, Mic, Send, Sparkles,
   AlertTriangle, CalendarClock, Mail, MessageSquare, FileText, ChevronRight,
-  CheckCircle2, XCircle, RefreshCw, Trash2, Filter, Eye, Bot, MapPin,
+  CheckCircle2, XCircle, RefreshCw, Trash2, Filter, Eye, Bot, MapPin, Plus, Loader2,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
@@ -28,11 +28,14 @@ function initials(name: string) {
 
 export default function ClientDetail() {
   const { id } = useParams();
+  const qc = useQueryClient();
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const [openDoc, setOpenDoc] = useState<Document | null>(null);
-  const [chat, setChat] = useState(chatHistory);
   const [chatInput, setChatInput] = useState("");
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
 
-  const { data: serverClient } = useQuery({
+  const { data: serverClient, isLoading: isClientLoading } = useQuery({
     queryKey: ["client", id],
     queryFn: async () => {
       if (!id) return null;
@@ -68,6 +71,10 @@ export default function ClientDetail() {
   const clientDocs = serverDocs?.length ? serverDocs : useMemo(() => documents.filter((d) => d.clientId === id), [id]);
   const clientDeadlines = useMemo(() => deadlines.filter((d) => d.clientId === id), [id]);
 
+  if (isClientLoading) {
+    return <div className="p-8 text-center text-muted-foreground">Loading client details...</div>;
+  }
+
   if (!client) return <Navigate to="/clients" replace />;
 
   const avgConfidence = Math.round(
@@ -75,14 +82,142 @@ export default function ClientDetail() {
   );
   const openFlags = clientDocs.reduce((a, d) => a + d.anomalies, 0);
 
-  const sendChat = () => {
-    if (!chatInput.trim()) return;
-    setChat((c) => [
-      ...c,
-      { id: `u-${Date.now()}`, role: "user", content: chatInput, timestamp: new Date().toISOString() },
-      { id: `a-${Date.now()}`, role: "assistant", content: `Based on ${client.name}'s documents, the most relevant data shows healthy compliance posture. Would you like me to drill into a specific filing?`, sources: [{ docId: clientDocs[0]?.id ?? "", filename: clientDocs[0]?.filename ?? "" }], timestamp: new Date().toISOString() },
-    ]);
+  // --- QnA: Sessions ---
+  const { data: qnaSessions } = useQuery({
+    queryKey: ["qna-sessions", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/v1/qna/sessions?client_id=${id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!id
+  });
+
+  // --- QnA: Messages for active session ---
+  const { data: qnaMessages, refetch: refetchMessages } = useQuery({
+    queryKey: ["qna-messages", activeSessionId],
+    queryFn: async () => {
+      if (!activeSessionId) return [];
+      const res = await fetch(`/api/v1/qna/sessions/${activeSessionId}/messages`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!activeSessionId
+  });
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [qnaMessages]);
+
+  const createSession = async () => {
+    const res = await fetch("/api/v1/qna/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+      body: JSON.stringify({ client_id: id })
+    });
+    if (!res.ok) { toast.error("Failed to create session"); return; }
+    const session = await res.json();
+    setActiveSessionId(session.id);
+    qc.invalidateQueries({ queryKey: ["qna-sessions", id] });
+  };
+
+  const sendChat = async () => {
+    if (!chatInput.trim() || isSending) return;
+    if (!activeSessionId) {
+      // Auto-create a session first
+      const res = await fetch("/api/v1/qna/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        body: JSON.stringify({ client_id: id })
+      });
+      if (!res.ok) { toast.error("Failed to create session"); return; }
+      const session = await res.json();
+      setActiveSessionId(session.id);
+      qc.invalidateQueries({ queryKey: ["qna-sessions", id] });
+      // now send to the new session
+      await sendMessageToSession(session.id, chatInput);
+      return;
+    }
+    await sendMessageToSession(activeSessionId, chatInput);
+  };
+
+  const sendMessageToSession = async (sessionId: string, content: string) => {
+    setIsSending(true);
     setChatInput("");
+    // Optimistic: add user message locally
+    qc.setQueryData(["qna-messages", sessionId], (old: any[] | undefined) => [
+      ...(old || []),
+      { id: `temp-user-${Date.now()}`, role: "user", content }
+    ]);
+    try {
+      const res = await fetch(`/api/v1/qna/sessions/${sessionId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        body: JSON.stringify({ content })
+      });
+      if (!res.ok) throw new Error("Failed");
+      // Refetch to get the real AI response
+      await refetchMessages();
+      qc.invalidateQueries({ queryKey: ["qna-sessions", id] }); // session name may have changed
+    } catch {
+      toast.error("Failed to get AI response");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // --- Recon: Summary ---
+  const { data: reconSummary } = useQuery({
+    queryKey: ["recon-summary", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/v1/recon/${id}/summary`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!id
+  });
+
+  const runReconMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/v1/recon/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        body: JSON.stringify({ client_id: id })
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Reconciliation completed");
+      qc.invalidateQueries({ queryKey: ["recon-summary", id] });
+    },
+    onError: () => toast.error("Reconciliation failed")
+  });
+
+  const handleDownloadReport = async () => {
+    try {
+      const res = await fetch(`/api/v1/clients/${client.id}/report`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (!res.ok) throw new Error("Failed to generate report");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${client.name}_Report.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("Report downloaded successfully");
+    } catch (e) {
+      toast.error("Failed to download report");
+    }
   };
 
   return (
@@ -125,10 +260,10 @@ export default function ClientDetail() {
                 <UploadIcon className="h-4 w-4" /> Upload documents
               </Link>
             </Button>
-            <Button variant="outline" className="gap-2" onClick={() => toast.success("Reconciliation started")}>
-              <Play className="h-4 w-4" /> Run reconciliation
+            <Button variant="outline" className="gap-2" onClick={() => runReconMutation.mutate()} disabled={runReconMutation.isPending}>
+              <Play className="h-4 w-4" /> {runReconMutation.isPending ? "Running..." : "Run reconciliation"}
             </Button>
-            <Button variant="outline" className="gap-2" onClick={() => toast.success("Report downloaded successfully")}>
+            <Button variant="outline" className="gap-2" onClick={handleDownloadReport}>
               <Download className="h-4 w-4" /> Report
             </Button>
           </div>
@@ -313,71 +448,77 @@ export default function ClientDetail() {
                       <SelectItem value="2023-24">FY 2023-24</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">Last run · 12 minutes ago by CA Anjali Mehta</p>
+                  <p className="text-xs text-muted-foreground">Automated Tier 1 & 2 matching engine</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" className="gap-2" onClick={() => toast.success("PDF exported successfully")}><Download className="h-4 w-4" /> Export PDF</Button>
-                  <Button className="gap-2 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95" onClick={() => toast.success("Reconciliation started")}><Play className="h-4 w-4" /> Run reconciliation</Button>
+                  <Button variant="outline" className="gap-2" onClick={handleDownloadReport}><Download className="h-4 w-4" /> Export PDF</Button>
+                  <Button className="gap-2 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95" onClick={() => runReconMutation.mutate()} disabled={runReconMutation.isPending}>
+                    {runReconMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                    {runReconMutation.isPending ? "Running..." : "Run reconciliation"}
+                  </Button>
                 </div>
               </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-lg border border-success/30 bg-success/8 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-success">Passed</p>
-                  <p className="mt-1 font-display text-2xl font-bold num-tabular text-success">{reconciliationChecks.filter(c => c.passed).length}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-success">Matched</p>
+                  <p className="mt-1 font-display text-2xl font-bold num-tabular text-success">{reconSummary?.passed ?? 0}</p>
                 </div>
                 <div className="rounded-lg border border-destructive/30 bg-destructive/8 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-destructive">Flagged</p>
-                  <p className="mt-1 font-display text-2xl font-bold num-tabular text-destructive">{reconciliationChecks.filter(c => !c.passed).length}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-destructive">Unmatched</p>
+                  <p className="mt-1 font-display text-2xl font-bold num-tabular text-destructive">{reconSummary?.flagged ?? 0}</p>
                 </div>
                 <div className="rounded-lg border border-border bg-muted/40 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total checks</p>
-                  <p className="mt-1 font-display text-2xl font-bold num-tabular">{reconciliationChecks.length}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total transactions</p>
+                  <p className="mt-1 font-display text-2xl font-bold num-tabular">{reconSummary?.total_checks ?? 0}</p>
                 </div>
               </div>
             </Card>
 
-            <div className="space-y-3">
-              {reconciliationChecks.map((c) => (
-                <Card key={c.id} className={`border-l-4 ${c.passed ? "border-l-success" : c.severity === "critical" ? "border-l-destructive" : "border-l-warning"} border-y-border/70 border-r-border/70 bg-card p-5 shadow-elegant`}>
-                  <div className="flex items-start gap-4">
-                    <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${c.passed ? "bg-success/12 text-success" : c.severity === "critical" ? "bg-destructive/12 text-destructive" : "bg-warning/12 text-warning"}`}>
-                      {c.passed ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-display text-sm font-bold">{c.name}</h3>
-                        <StatusBadge status={c.passed ? "filed" : c.severity} />
+            {/* Fallback: still show old mock checks if no real data */}
+            {reconciliationChecks.length > 0 && !reconSummary?.total_checks && (
+              <div className="space-y-3">
+                {reconciliationChecks.map((c) => (
+                  <Card key={c.id} className={`border-l-4 ${c.passed ? "border-l-success" : c.severity === "critical" ? "border-l-destructive" : "border-l-warning"} border-y-border/70 border-r-border/70 bg-card p-5 shadow-elegant`}>
+                    <div className="flex items-start gap-4">
+                      <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${c.passed ? "bg-success/12 text-success" : c.severity === "critical" ? "bg-destructive/12 text-destructive" : "bg-warning/12 text-warning"}`}>
+                        {c.passed ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">{c.message}</p>
-
-                      {c.flagged && (
-                        <div className="mt-3 overflow-hidden rounded-lg border border-border/60">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="bg-muted/30 hover:bg-muted/30">
-                                <TableHead className="h-8 text-[10px] font-semibold uppercase tracking-wider">Item</TableHead>
-                                <TableHead className="h-8 text-right text-[10px] font-semibold uppercase tracking-wider">In books</TableHead>
-                                <TableHead className="h-8 text-right text-[10px] font-semibold uppercase tracking-wider">Per portal</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {c.flagged.map((f, i) => (
-                                <TableRow key={i} className="border-border/40 hover:bg-transparent">
-                                  <TableCell className="py-2 text-xs">{f.label}</TableCell>
-                                  <TableCell className="py-2 text-right text-xs font-semibold num-tabular">{f.book}</TableCell>
-                                  <TableCell className="py-2 text-right text-xs font-semibold num-tabular">{f.portal}</TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-display text-sm font-bold">{c.name}</h3>
+                          <StatusBadge status={c.passed ? "filed" : c.severity} />
                         </div>
-                      )}
+                        <p className="mt-1 text-sm text-muted-foreground">{c.message}</p>
+
+                        {c.flagged && (
+                          <div className="mt-3 overflow-hidden rounded-lg border border-border/60">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                                  <TableHead className="h-8 text-[10px] font-semibold uppercase tracking-wider">Item</TableHead>
+                                  <TableHead className="h-8 text-right text-[10px] font-semibold uppercase tracking-wider">In books</TableHead>
+                                  <TableHead className="h-8 text-right text-[10px] font-semibold uppercase tracking-wider">Per portal</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {c.flagged.map((f, i) => (
+                                  <TableRow key={i} className="border-border/40 hover:bg-transparent">
+                                    <TableCell className="py-2 text-xs">{f.label}</TableCell>
+                                    <TableCell className="py-2 text-right text-xs font-semibold num-tabular">{f.book}</TableCell>
+                                    <TableCell className="py-2 text-right text-xs font-semibold num-tabular">{f.portal}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           {/* DEADLINES */}
@@ -464,65 +605,98 @@ export default function ClientDetail() {
                 <div className="flex items-center gap-2">
                   <Bot className="h-4 w-4 text-primary" />
                   <h3 className="font-display text-sm font-bold">Ask anything about {client.name}</h3>
-                  <span className="ml-auto text-[10px] font-medium text-muted-foreground">Powered by Gemma 4:e4b · runs locally</span>
+                  <span className="ml-auto text-[10px] font-medium text-muted-foreground">Powered by Gemma 4:e2b · runs locally</span>
                 </div>
               </div>
 
-              <div className="flex h-[460px] flex-col">
-                <div className="flex-1 space-y-4 overflow-y-auto p-5">
-                  {chat.length === 0 && (
-                    <div className="grid h-full place-items-center text-center text-muted-foreground">
-                      <div>
-                        <Sparkles className="mx-auto mb-2 h-6 w-6 text-primary" />
-                        <p className="text-sm">Ask about filings, anomalies, or trends.</p>
-                      </div>
-                    </div>
-                  )}
-                  {chat.map((m) => (
-                    <div key={m.id} className={`flex gap-3 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
-                      <Avatar className="h-8 w-8 shrink-0 border border-border">
-                        <AvatarFallback className={m.role === "user" ? "bg-muted text-xs" : "bg-gradient-primary text-xs text-primary-foreground"}>
-                          {m.role === "user" ? "AM" : <Bot className="h-3.5 w-3.5" />}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className={`max-w-[75%] space-y-2 rounded-2xl px-4 py-2.5 text-sm ${m.role === "user" ? "rounded-tr-md bg-primary text-primary-foreground" : "rounded-tl-md bg-muted/60"}`}>
-                        <p className="leading-relaxed" dangerouslySetInnerHTML={{ __html: m.content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
-                        {m.sources && (
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {m.sources.map((s) => (
-                              <span key={s.docId} className="inline-flex items-center gap-1 rounded-full border border-border bg-card/80 px-2 py-0.5 text-[10px] font-medium text-foreground">
-                                <FileText className="h-2.5 w-2.5" /> {s.filename}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="border-t border-border/60 bg-muted/20 p-3">
-                  <div className="mb-2 flex flex-wrap gap-1.5">
-                    {["What's the total ITC for FY 24-25?", "Show GSTR-3B late fees", "Any TDS mismatches?"].map((q) => (
-                      <button key={q} onClick={() => setChatInput(q)} className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                        {q}
+              <div className="flex h-[520px]">
+                {/* Sessions sidebar */}
+                <div className="w-48 shrink-0 border-r border-border/60 flex flex-col bg-muted/10">
+                  <div className="p-2 border-b border-border/40">
+                    <Button size="sm" variant="outline" className="w-full gap-1 text-xs h-8" onClick={createSession}>
+                      <Plus className="h-3 w-3" /> New chat
+                    </Button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-1 space-y-0.5">
+                    {(qnaSessions || []).map((s: any) => (
+                      <button
+                        key={s.id}
+                        onClick={() => setActiveSessionId(s.id)}
+                        className={`w-full text-left rounded-md px-2.5 py-2 text-[11px] truncate transition-colors ${
+                          activeSessionId === s.id
+                            ? "bg-primary/10 text-primary font-semibold"
+                            : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                        }`}
+                      >
+                        {s.session_name}
                       </button>
                     ))}
+                    {(!qnaSessions || qnaSessions.length === 0) && (
+                      <p className="text-[10px] text-muted-foreground text-center py-4">No sessions yet</p>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" aria-label="Voice input">
-                      <Mic className="h-4 w-4" />
-                    </Button>
-                    <Input
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && sendChat()}
-                      placeholder={`Ask about ${client.name}…`}
-                      className="h-10 border-border bg-card"
-                    />
-                    <Button size="icon" onClick={sendChat} className="h-10 w-10 shrink-0 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95">
-                      <Send className="h-4 w-4" />
-                    </Button>
+                </div>
+
+                {/* Chat area */}
+                <div className="flex-1 flex flex-col">
+                  <div className="flex-1 space-y-4 overflow-y-auto p-5">
+                    {!activeSessionId && (
+                      <div className="grid h-full place-items-center text-center text-muted-foreground">
+                        <div>
+                          <Sparkles className="mx-auto mb-2 h-6 w-6 text-primary" />
+                          <p className="text-sm">Start a new chat or select a session.</p>
+                          <p className="text-xs mt-1">Ask about filings, anomalies, or trends.</p>
+                        </div>
+                      </div>
+                    )}
+                    {activeSessionId && (qnaMessages || []).map((m: any) => (
+                      <div key={m.id} className={`flex gap-3 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
+                        <Avatar className="h-8 w-8 shrink-0 border border-border">
+                          <AvatarFallback className={m.role === "user" ? "bg-muted text-xs" : "bg-gradient-primary text-xs text-primary-foreground"}>
+                            {m.role === "user" ? "You" : <Bot className="h-3.5 w-3.5" />}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className={`max-w-[75%] space-y-2 rounded-2xl px-4 py-2.5 text-sm ${m.role === "user" ? "rounded-tr-md bg-primary text-primary-foreground" : "rounded-tl-md bg-muted/60"}`}>
+                          <p className="leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {isSending && (
+                      <div className="flex gap-3">
+                        <Avatar className="h-8 w-8 shrink-0 border border-border">
+                          <AvatarFallback className="bg-gradient-primary text-xs text-primary-foreground">
+                            <Bot className="h-3.5 w-3.5" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="rounded-2xl rounded-tl-md bg-muted/60 px-4 py-2.5">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </div>
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+
+                  <div className="border-t border-border/60 bg-muted/20 p-3">
+                    <div className="mb-2 flex flex-wrap gap-1.5">
+                      {["What's the total ITC for FY 24-25?", "Show GSTR-3B late fees", "Any TDS mismatches?"].map((q) => (
+                        <button key={q} onClick={() => setChatInput(q)} className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && sendChat()}
+                        placeholder={`Ask about ${client.name}…`}
+                        className="h-10 border-border bg-card"
+                        disabled={isSending}
+                      />
+                      <Button size="icon" onClick={sendChat} disabled={isSending || !chatInput.trim()} className="h-10 w-10 shrink-0 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95">
+                        {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>

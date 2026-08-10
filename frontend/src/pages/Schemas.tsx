@@ -167,7 +167,7 @@ export default function Schemas() {
         {!isLoading && schemas.length === 0 && (
           <div className="col-span-full rounded-xl border border-dashed border-border bg-card p-12 text-center">
             <Wand2 className="mx-auto h-8 w-8 text-muted-foreground/50" />
-            <p className="mt-3 text-sm text-muted-foreground">No schemas yet — create one to start extracting structured data with Gemma 4:e4b.</p>
+            <p className="mt-3 text-sm text-muted-foreground">No schemas yet — create one to start extracting structured data with Gemma 4:e2b.</p>
           </div>
         )}
         {schemas.map((s: any) => (

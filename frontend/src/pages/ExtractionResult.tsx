@@ -274,7 +274,7 @@ export default function ExtractionResult() {
             <div className="mt-4 flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/8 px-4 py-3">
               <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
               <p className="text-sm text-foreground">
-                <strong>Processing in progress.</strong> gemma4:e4b is analyzing your document. This page will refresh automatically.
+                <strong>Processing in progress.</strong> gemma4:e2b is analyzing your document. This page will refresh automatically.
               </p>
             </div>
           )}
@@ -346,7 +346,7 @@ export default function ExtractionResult() {
             ) : (
               <>
                 <p className="text-[11px] text-muted-foreground mb-4 italic">
-                  gemma4:e4b found these additional fields. Use the <Plus className="inline h-3 w-3" /> icon to add them to the main record.
+                  gemma4:e2b found these additional fields. Use the <Plus className="inline h-3 w-3" /> icon to add them to the main record.
                 </p>
                 {Object.entries(keyFields).map(([k, v]) => (
                   <FieldRow 

@@ -220,7 +220,7 @@ export default function Auth() {
             <div className="grid gap-3">
               {[
                 { icon: Lock, title: "Client confidentiality, by design", desc: "Documents never leave your infrastructure." },
-                { icon: ServerCog, title: "Powered by local Gemma 4:e4b", desc: "Air-gapped Ollama runtime, no API calls." },
+                { icon: ServerCog, title: "Powered by local Gemma 4:e2b", desc: "Air-gapped Ollama runtime, no API calls." },
                 { icon: Shield, title: "Built for ICAI compliance", desc: "Audit trails, role-based access, retention." },
               ].map((f) => (
                 <div key={f.title} className="group flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl transition-all hover:border-white/25 hover:bg-white/8">

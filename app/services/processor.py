@@ -1,7 +1,7 @@
 """
 Real document processing pipeline.
 Reads the uploaded file from local storage, extracts text (PDF or image),
-sends it to Ollama gemma4:e4b for structured extraction, then saves results.
+sends it to Ollama gemma4:e2b for structured extraction, then saves results.
 """
 import os
 import logging

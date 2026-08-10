@@ -1,5 +1,5 @@
 """
-Real extraction pipeline using Ollama gemma4:e4b.
+Real extraction pipeline using Ollama gemma4:e2b.
 Sends document text (or image) to Ollama and parses structured JSON output.
 """
 import json
