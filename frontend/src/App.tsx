@@ -12,6 +12,7 @@ import ClientDetail from "./pages/ClientDetail";
 import Upload from "./pages/Upload";
 import Schemas from "./pages/Schemas";
 import Jobs from "./pages/Jobs";
+import Extraction from "./pages/Extraction";
 import Settings from "./pages/Settings";
 import Activity from "./pages/Activity";
 import FirmActivity from "./pages/FirmActivity";
@@ -139,7 +140,8 @@ const App = () => (
                 <Route path="/clients/:id" element={<ClientDetail />} />
                 <Route path="/clients/:id/upload" element={<Upload />} />
                 <Route path="/schemas" element={<Schemas />} />
-                <Route path="/jobs" element={<Jobs />} />
+                <Route path="/extraction" element={<Extraction />} />
+                <Route path="/jobs" element={<Navigate to="/activity?tab=jobs" replace />} />
                 <Route path="/activity" element={<Activity />} />
                 <Route path="/firm-activity" element={<FirmActivity />} />
                 <Route path="/settings" element={<Settings />} />

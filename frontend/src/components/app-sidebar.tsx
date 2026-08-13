@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, FileStack, Workflow, Settings, Activity, FileSearch } from "lucide-react";
+import { LayoutDashboard, Users, FileStack, Settings, Activity, FileSearch } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -24,7 +24,7 @@ const mainItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard, end: true },
   { title: "Clients", url: "/clients", icon: Users, badge: "10" },
   { title: "Schemas", url: "/schemas", icon: FileSearch },
-  { title: "Jobs", url: "/jobs", icon: Workflow, badge: "3", badgeVariant: "primary" as const },
+  { title: "Extraction", url: "/extraction", icon: FileStack, badge: "New", badgeVariant: "primary" as const },
 ];
 
 const userItems = [

@@ -234,7 +234,7 @@ export default function ExtractionResult() {
             <Link to={`/clients/${data.clientId || ""}`}><ArrowLeft className="h-4 w-4" /> Back to client</Link>
           </Button>
           <Button asChild variant="outline" className="gap-2">
-            <Link to={`/clients/${data.clientId || ""}/upload`}><UploadCloud className="h-4 w-4" /> Upload more</Link>
+            <Link to="/extraction"><UploadCloud className="h-4 w-4" /> Upload more</Link>
           </Button>
         </div>
       </PageHeader>

@@ -379,7 +379,7 @@ export default function ClientDetail() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button asChild className="gap-2 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95">
-              <Link to={`/clients/${client.id}/upload`}>
+              <Link to="/extraction">
                 <UploadIcon className="h-4 w-4" /> Upload documents
               </Link>
             </Button>
@@ -443,7 +443,7 @@ export default function ClientDetail() {
                 <h3 className="font-display text-base font-bold">Quick actions</h3>
                 <div className="mt-4 grid gap-2">
                   {[
-                    { icon: UploadIcon, label: "Upload documents", to: `/clients/${client.id}/upload` },
+                    { icon: UploadIcon, label: "Upload documents", to: "/extraction" },
                     { icon: Play, label: "Run reconciliation", action: () => toast.success("Reconciliation started") },
                     { icon: Download, label: "Download FY report", action: () => toast.success("Report downloaded successfully") },
                     { icon: Mail, label: "Email missing-doc reminder", action: () => toast.success("Reminder email sent") },

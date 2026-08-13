@@ -132,6 +132,39 @@ async def upload_document(
     return create_response(data={"job_id": str(job.id), "document_id": str(doc.id)})
 
 
+@router.get("")
+async def get_all_documents(
+    firm: Firm = Depends(get_current_firm),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Document).where(Document.firm_id == firm.id).order_by(Document.uploaded_at.desc())
+    )
+    docs = result.scalars().all()
+    out = []
+    for d in docs:
+        size_bytes = 0
+        try:
+            if d.file_path and not d.file_path.startswith("s3://") and os.path.exists(d.file_path):
+                size_bytes = os.path.getsize(d.file_path)
+        except Exception:
+            pass
+        out.append({
+            "id": str(d.id),
+            "clientId": str(d.client_id),
+            "filename": d.original_filename,
+            "size": f"{size_bytes / 1024 / 1024:.2f} MB" if size_bytes else "—",
+            "docType": d.doc_type or "Unknown",
+            "financialYear": d.financial_year or "2024-25",
+            "status": d.status,
+            "confidence": d.confidence,
+            "anomalies": len(d.anomalies) if isinstance(d.anomalies, list) else 0,
+            "uploadedAt": d.uploaded_at.isoformat() if d.uploaded_at else None,
+            "extractedData": d.extracted_data,
+        })
+    return create_response(data=out)
+
+
 @router.get("/client/{client_id}")
 async def get_client_documents(
     client_id: uuid.UUID,

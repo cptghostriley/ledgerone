@@ -325,8 +325,25 @@ export default function Schemas() {
             </div>
 
             <div className="mt-5 flex items-center justify-between border-t border-border/60 pt-3 text-[11px] text-muted-foreground">
-              <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" /> Created {s.created_at ? formatDistanceToNow(new Date(s.created_at), { addSuffix: true }) : "recently"}</span>
-              <button className="inline-flex items-center gap-1 font-semibold text-primary hover:underline" onClick={() => openEditModal(s)}>Edit Schema <ArrowRight className="h-3 w-3" /></button>
+              <span className="inline-flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                Created {s.created_at ? formatDistanceToNow(new Date(s.created_at), { addSuffix: true }) : "recently"}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
+                  onClick={() => openEditModal(s)}
+                >
+                  <Edit3 className="h-3 w-3" /> Edit
+                </button>
+                <button
+                  className="inline-flex items-center gap-1 font-semibold text-destructive hover:underline ml-2"
+                  onClick={() => deleteSchemaMutation.mutate(s.id)}
+                  disabled={deleteSchemaMutation.isPending}
+                >
+                  <Trash2 className="h-3 w-3" /> Delete
+                </button>
+              </div>
             </div>
           </Card>
         ))}
