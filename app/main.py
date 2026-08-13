@@ -9,11 +9,16 @@ from app.api.v1 import documents, auth, clients, jobs, dashboard, activity, sche
 from app.core.database import engine
 from app.models.models import Base
 
+from sqlalchemy import text
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     # Auto-create all tables on startup (idempotent)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text("ALTER TABLE schema_defs ADD COLUMN IF NOT EXISTS description TEXT;"))
+        await conn.execute(text("ALTER TABLE schema_defs ADD COLUMN IF NOT EXISTS doc_type VARCHAR;"))
+        await conn.execute(text("ALTER TABLE schema_defs ADD COLUMN IF NOT EXISTS category VARCHAR;"))
     yield
 
 app = FastAPI(

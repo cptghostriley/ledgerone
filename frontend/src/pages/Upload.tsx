@@ -6,7 +6,7 @@ import { UploadCloud, FileText, X, CheckCircle2, ArrowLeft, Sparkles, ExternalLi
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
 interface UploadedFile {
@@ -222,11 +222,24 @@ export default function Upload() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {serverSchemas?.map((s: any) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
+                    {["GST Compliance", "Direct Tax & Income Tax", "Accounting & Banking", "Financial Statements & Audit", "Other"].map((cat) => {
+                      const schemasInCat = serverSchemas?.filter(
+                        (s: any) => (s.category || "Other") === cat
+                      );
+                      if (!schemasInCat || schemasInCat.length === 0) return null;
+                      return (
+                        <SelectGroup key={cat}>
+                          <SelectLabel className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider bg-muted/40">
+                            {cat}
+                          </SelectLabel>
+                          {schemasInCat.map((s: any) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>

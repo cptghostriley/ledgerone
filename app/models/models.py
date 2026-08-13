@@ -82,6 +82,9 @@ class SchemaDef(Base):
     firm_id = Column(UUID(as_uuid=True), ForeignKey("firms.id"), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    doc_type = Column(String, nullable=True)
+    category = Column(String, nullable=True)
     fields = Column(JSONB)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
