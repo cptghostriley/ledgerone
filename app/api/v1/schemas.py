@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from app.core.database import get_db
 from app.models.models import SchemaDef, Firm, User
 from app.api.deps import get_current_firm, get_current_user
@@ -244,21 +244,26 @@ DEFAULT_SCHEMAS = [
 ]
 
 async def seed_defaults_if_empty(db: AsyncSession, firm_id: uuid.UUID, user_id: uuid.UUID):
-    result = await db.execute(select(SchemaDef).where(SchemaDef.firm_id == firm_id, SchemaDef.user_id == user_id))
+    result = await db.execute(
+        select(SchemaDef).where(
+            SchemaDef.firm_id == firm_id,
+            SchemaDef.user_id == user_id,
+            or_(SchemaDef.is_deleted == False, SchemaDef.is_deleted.is_(None))
+        )
+    )
     existing = result.scalars().all()
-    if not existing or len(existing) < 3:
-        existing_names = {s.name for s in existing}
+    if not existing:
         for s in DEFAULT_SCHEMAS:
-            if s["name"] not in existing_names:
-                db.add(SchemaDef(
-                    firm_id=firm_id,
-                    user_id=user_id,
-                    name=s["name"],
-                    doc_type=s["doc_type"],
-                    category=s["category"],
-                    description=s["description"],
-                    fields=s["fields"]
-                ))
+            db.add(SchemaDef(
+                firm_id=firm_id,
+                user_id=user_id,
+                name=s["name"],
+                doc_type=s["doc_type"],
+                category=s["category"],
+                description=s["description"],
+                fields=s["fields"],
+                is_deleted=False
+            ))
         await db.commit()
 
 @router.get("")
@@ -270,7 +275,11 @@ async def get_schemas(
     await seed_defaults_if_empty(db, firm.id, user.id)
     result = await db.execute(
         select(SchemaDef)
-        .where(SchemaDef.firm_id == firm.id, SchemaDef.user_id == user.id)
+        .where(
+            SchemaDef.firm_id == firm.id,
+            SchemaDef.user_id == user.id,
+            or_(SchemaDef.is_deleted == False, SchemaDef.is_deleted.is_(None))
+        )
         .order_by(SchemaDef.created_at.asc())
     )
     schemas = result.scalars().all()
@@ -301,7 +310,8 @@ async def create_schema(
         doc_type=data.doc_type,
         category=data.category,
         description=data.description,
-        fields=data.fields
+        fields=data.fields,
+        is_deleted=False
     )
     db.add(schema_def)
     await db.commit()
@@ -374,7 +384,7 @@ async def delete_schema(
     if not schema_def:
         raise HTTPException(status_code=404, detail="Schema not found")
 
-    await db.delete(schema_def)
+    schema_def.is_deleted = True
     await db.commit()
     return create_response(message="Schema deleted successfully")
 

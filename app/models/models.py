@@ -86,6 +86,7 @@ class SchemaDef(Base):
     doc_type = Column(String, nullable=True)
     category = Column(String, nullable=True)
     fields = Column(JSONB)
+    is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class Document(Base):

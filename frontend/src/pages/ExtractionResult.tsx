@@ -302,72 +302,81 @@ export default function ExtractionResult() {
 
         <div className="grid gap-5 lg:grid-cols-2">
           {/* Main Extraction Results */}
-          <Card className="border-border/70 bg-card p-5 shadow-elegant">
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <h3 className="font-display text-sm font-bold">Main Extraction Result</h3>
-            </div>
-            {!isPending && Object.keys(extracted).length === 0 && (
-              <p className="text-sm text-muted-foreground">No data extracted yet.</p>
-            )}
-            <div>
-              <FieldRow label="Document Type" value={extracted.document_type} />
-              <FieldRow label="Entity Name" value={extracted.entity_name} />
-              <FieldRow label="PAN" value={extracted.pan} />
-              <FieldRow label="GSTIN" value={extracted.gstin} />
-              <FieldRow label="Financial Year" value={extracted.financial_year} />
-              <FieldRow label="Total Amount" value={extracted.total_amount != null ? `₹ ${Number(extracted.total_amount).toLocaleString("en-IN")}` : null} />
-              <FieldRow label="Tax Amount" value={extracted.tax_amount != null ? `₹ ${Number(extracted.tax_amount).toLocaleString("en-IN")}` : null} />
-              <FieldRow label="Summary" value={extracted.summary} />
-              
-              {/* Show promoted fields (fields that aren't core but are at root) */}
-              {Object.entries(extracted).map(([k, v]) => {
-                if (coreKeys.includes(k) || k === "key_fields" || k === "line_items" || k === "dates" || k === "raw_response") return null;
-                return (
-                  <FieldRow 
-                    key={k} 
-                    label={k} 
-                    value={v as any} 
-                    onRemove={() => handleRemove(k, false)} 
-                  />
-                );
-              })}
-            </div>
-          </Card>
+          {(() => {
+            const mainEntries: [string, any][] = [];
+            const addedKeys = new Set<string>();
+
+            // 1. Core fields order
+            const coreKeys = ["document_type", "entity_name", "pan", "gstin", "financial_year", "total_amount", "tax_amount", "summary"];
+            coreKeys.forEach((k) => {
+              if (extracted[k] !== undefined) {
+                mainEntries.push([k, extracted[k]]);
+                addedKeys.add(k);
+              }
+            });
+
+            // 2. Add all key_fields (schema fields extracted by gemma4)
+            if (extracted.key_fields && typeof extracted.key_fields === "object") {
+              Object.entries(extracted.key_fields).forEach(([k, v]) => {
+                if (!addedKeys.has(k)) {
+                  mainEntries.push([k, v]);
+                  addedKeys.add(k);
+                }
+              });
+            }
+
+            // 3. Add remaining root keys
+            Object.entries(extracted).forEach(([k, v]) => {
+              if (!addedKeys.has(k) && !["line_items", "dates", "raw_response", "key_fields", "schema_id", "schema_name"].includes(k)) {
+                mainEntries.push([k, v]);
+                addedKeys.add(k);
+              }
+            });
+
+            return (
+              <Card className="border-border/70 bg-card p-5 shadow-elegant">
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <h3 className="font-display text-sm font-bold">Main Extraction Result</h3>
+                </div>
+                {!isPending && mainEntries.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No data extracted yet.</p>
+                )}
+                <div>
+                  {mainEntries.map(([k, v]) => (
+                    <FieldRow
+                      key={k}
+                      label={k}
+                      value={v as any}
+                      onRemove={() => handleRemove(k, extracted.key_fields && k in extracted.key_fields)}
+                    />
+                  ))}
+                </div>
+              </Card>
+            );
+          })()}
 
           {/* AI Discoveries / Additional Fields */}
           <Card className="border-border/70 bg-card p-5 shadow-elegant">
             <div className="flex items-center gap-2 mb-4">
               <Hash className="h-4 w-4 text-primary" />
-              <h3 className="font-display text-sm font-bold">AI Discoveries</h3>
+              <h3 className="font-display text-sm font-bold">AI Discoveries & Dates</h3>
             </div>
-            {Object.keys(keyFields).length === 0 && dates.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No additional fields discovered.</p>
+            {dates.length === 0 ? (
+              <p className="text-sm text-muted-foreground">All extracted schema fields are rendered in Main Extraction Result.</p>
             ) : (
-              <>
-                <p className="text-[11px] text-muted-foreground mb-4 italic">
-                  gemma4 found these additional fields. Use the <Plus className="inline h-3 w-3" /> icon to add them to the main record.
-                </p>
-                {Object.entries(keyFields).map(([k, v]) => (
-                  <FieldRow 
-                    key={k} 
-                    label={k} 
-                    value={v as any} 
-                    onPromote={() => handlePromote(k, v)}
-                    onRemove={() => handleRemove(k, true)}
-                  />
-                ))}
+              <div className="space-y-4">
                 {dates.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-border/40">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Dates Found</p>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Important Dates Discovered</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {dates.map((d, i) => (
-                        <Badge key={i} variant="outline" className="text-xs font-mono">{d}</Badge>
+                      {dates.map((d: string, i: number) => (
+                        <Badge key={i} variant="outline" className="text-xs font-mono bg-primary/5 text-primary border-primary/20">{d}</Badge>
                       ))}
                     </div>
                   </div>
                 )}
-              </>
+              </div>
             )}
           </Card>
         </div>

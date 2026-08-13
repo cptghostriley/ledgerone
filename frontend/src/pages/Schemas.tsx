@@ -295,11 +295,11 @@ export default function Schemas() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditModal(s)} title="Edit schema">
-                    <Edit3 className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                <div className="flex items-center gap-1">
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => openEditModal(s)} title="Edit schema">
+                    <Edit3 className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => deleteSchemaMutation.mutate(s.id)} title="Delete schema">
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={() => deleteSchemaMutation.mutate(s.id)} title="Delete schema">
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -329,21 +329,6 @@ export default function Schemas() {
                 <Calendar className="h-3 w-3" />
                 Created {s.created_at ? formatDistanceToNow(new Date(s.created_at), { addSuffix: true }) : "recently"}
               </span>
-              <div className="flex items-center gap-2">
-                <button
-                  className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
-                  onClick={() => openEditModal(s)}
-                >
-                  <Edit3 className="h-3 w-3" /> Edit
-                </button>
-                <button
-                  className="inline-flex items-center gap-1 font-semibold text-destructive hover:underline ml-2"
-                  onClick={() => deleteSchemaMutation.mutate(s.id)}
-                  disabled={deleteSchemaMutation.isPending}
-                >
-                  <Trash2 className="h-3 w-3" /> Delete
-                </button>
-              </div>
             </div>
           </Card>
         ))}

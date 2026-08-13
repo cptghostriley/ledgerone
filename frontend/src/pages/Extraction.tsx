@@ -501,70 +501,108 @@ export default function Extraction() {
               )}
 
               {/* Extracted Fields */}
-              <div className="grid gap-5 lg:grid-cols-2">
-                <Card className="border-border/70 bg-card p-5 shadow-elegant">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <h3 className="font-display text-sm font-bold">Main Extraction Result</h3>
-                  </div>
-                  {!isPending && Object.keys(extracted).length === 0 && (
-                    <p className="text-sm text-muted-foreground">No data extracted yet.</p>
-                  )}
-                  <div className="space-y-3">
-                    {["document_type", "entity_name", "pan", "gstin", "financial_year", "total_amount", "tax_amount", "summary"].map((k) => {
-                      const v = extracted[k];
-                      const isEditing = editingField === k;
-                      return (
-                        <div key={k} className="flex items-center justify-between border-b border-border/40 pb-2 text-xs">
-                          <span className="font-mono text-muted-foreground uppercase">{k.replace(/_/g, " ")}</span>
-                          {isEditing ? (
-                            <div className="flex items-center gap-1.5">
-                              <Input
-                                value={editedValues[k] !== undefined ? editedValues[k] : v || ""}
-                                onChange={(e) => setEditedValues({ ...editedValues, [k]: e.target.value })}
-                                className="h-7 w-44 text-xs"
-                              />
-                              <Button size="xs" onClick={() => handleSaveField(k)}>Save</Button>
+              {(() => {
+                // Combine standard fields, root fields, and key_fields (schema fields) into Main Result
+                const mainEntries: [string, any][] = [];
+                const addedKeys = new Set<string>();
+
+                // 1. Standard core fields first if present
+                const coreOrder = ["document_type", "entity_name", "pan", "gstin", "financial_year", "total_amount", "tax_amount", "summary"];
+                coreOrder.forEach((k) => {
+                  if (extracted[k] !== undefined) {
+                    mainEntries.push([k, extracted[k]]);
+                    addedKeys.add(k);
+                  }
+                });
+
+                // 2. Add all schema/key fields extracted by gemma4
+                if (extracted.key_fields && typeof extracted.key_fields === "object") {
+                  Object.entries(extracted.key_fields).forEach(([k, v]) => {
+                    if (!addedKeys.has(k)) {
+                      mainEntries.push([k, v]);
+                      addedKeys.add(k);
+                    }
+                  });
+                }
+
+                // 3. Add remaining root keys
+                Object.entries(extracted).forEach(([k, v]) => {
+                  if (!addedKeys.has(k) && !["line_items", "dates", "raw_response", "key_fields", "schema_id", "schema_name"].includes(k)) {
+                    mainEntries.push([k, v]);
+                    addedKeys.add(k);
+                  }
+                });
+
+                return (
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    <Card className="border-border/70 bg-card p-5 shadow-elegant">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        <h3 className="font-display text-sm font-bold">Main Extraction Result</h3>
+                      </div>
+                      {!isPending && mainEntries.length === 0 && (
+                        <p className="text-sm text-muted-foreground">No data extracted yet.</p>
+                      )}
+                      <div className="space-y-2.5">
+                        {mainEntries.map(([k, v]) => {
+                          const isEditing = editingField === k;
+                          const displayVal = v != null && v !== "" ? String(v) : "Not Found";
+                          return (
+                            <div key={k} className="flex items-center justify-between border-b border-border/40 pb-2 text-xs hover:bg-muted/20 px-1.5 py-1 rounded">
+                              <span className="font-mono text-muted-foreground uppercase text-[11px] min-w-[130px]">
+                                {k.replace(/_/g, " ")}
+                              </span>
+                              {isEditing ? (
+                                <div className="flex items-center gap-1.5">
+                                  <Input
+                                    value={editedValues[k] !== undefined ? editedValues[k] : v || ""}
+                                    onChange={(e) => setEditedValues({ ...editedValues, [k]: e.target.value })}
+                                    className="h-7 w-44 text-xs font-mono"
+                                  />
+                                  <Button size="xs" onClick={() => handleSaveField(k, extracted.key_fields && k in extracted.key_fields)}>Save</Button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 max-w-[65%] text-right">
+                                  <span className={`font-semibold ${displayVal === "Not Found" ? "text-muted-foreground italic font-normal" : "text-foreground"}`}>
+                                    {displayVal}
+                                  </span>
+                                  <Button size="icon" variant="ghost" className="h-6 w-6 opacity-60 hover:opacity-100 shrink-0" onClick={() => { setEditingField(k); setEditedValues({ [k]: v }); }}>
+                                    <Edit3 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-foreground">{v != null ? String(v) : "Not Found"}</span>
-                              <Button size="icon" variant="ghost" className="h-6 w-6 opacity-60 hover:opacity-100" onClick={() => { setEditingField(k); setEditedValues({ [k]: v }); }}>
-                                <Edit3 className="h-3 w-3" />
-                              </Button>
+                          );
+                        })}
+                      </div>
+                    </Card>
+
+                    {/* AI Discoveries */}
+                    <Card className="border-border/70 bg-card p-5 shadow-elegant">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Hash className="h-4 w-4 text-primary" />
+                        <h3 className="font-display text-sm font-bold">AI Discoveries & Dates</h3>
+                      </div>
+                      {dates.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">All extracted schema fields are rendered in Main Extraction Result.</p>
+                      ) : (
+                        <div className="space-y-4">
+                          {dates.length > 0 && (
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Important Dates Discovered</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {dates.map((d: string, i: number) => (
+                                  <Badge key={i} variant="outline" className="text-xs font-mono bg-primary/5 text-primary border-primary/20">{d}</Badge>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
-                      );
-                    })}
+                      )}
+                    </Card>
                   </div>
-                </Card>
-
-                {/* AI Discoveries */}
-                <Card className="border-border/70 bg-card p-5 shadow-elegant">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Hash className="h-4 w-4 text-primary" />
-                    <h3 className="font-display text-sm font-bold">AI Discoveries</h3>
-                  </div>
-                  {Object.keys(keyFields).length === 0 && dates.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No additional fields discovered.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {Object.entries(keyFields).map(([k, v]) => (
-                        <div key={k} className="flex items-center justify-between border-b border-border/40 pb-2 text-xs">
-                          <span className="font-mono text-muted-foreground">{k}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-foreground">{String(v)}</span>
-                            <Button size="icon" variant="ghost" className="h-6 w-6 text-primary" onClick={() => handlePromoteField(k, v)} title="Add to main record">
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </Card>
-              </div>
+                );
+              })()}
             </div>
           )}
         </div>
