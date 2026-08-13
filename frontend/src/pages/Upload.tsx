@@ -187,7 +187,7 @@ export default function Upload() {
         <div className="mx-6 mb-0 mt-4 flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/8 px-5 py-3 md:mx-8">
           <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
           <p className="text-sm text-foreground">
-            <strong>Processing with gemma4:e2b…</strong> Hang tight, the results page will open automatically.
+            <strong>Processing with gemma4…</strong> Hang tight, the results page will open automatically.
           </p>
         </div>
       )}
@@ -325,7 +325,7 @@ export default function Upload() {
           <ol className="mt-4 space-y-3">
             {[
               { n: 1, title: "Local OCR", desc: "Files are parsed on your firm's server using Tesseract & layout models." },
-              { n: 2, title: "Schema extraction", desc: "gemma4:e2b maps the content to your selected schema fields." },
+              { n: 2, title: "Schema extraction", desc: "gemma4 maps the content to your selected schema fields." },
               { n: 3, title: "Anomaly detection", desc: "Rules engine checks values against your custom thresholds." },
               { n: 4, title: "Ready in client folder", desc: "Documents become searchable and join future reconciliations." },
             ].map((s) => (

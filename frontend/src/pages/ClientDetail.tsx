@@ -34,6 +34,10 @@ export default function ClientDetail() {
   const [chatInput, setChatInput] = useState("");
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [selectedBankTxnId, setSelectedBankTxnId] = useState<string | null>(null);
+  const [selectedLedgerEntryId, setSelectedLedgerEntryId] = useState<string | null>(null);
+  const [followUpMessage, setFollowUpMessage] = useState("");
+  const [lockMonthYear, setLockMonthYear] = useState(format(new Date(), "yyyy-MM"));
 
   const { data: serverClient, isLoading: isClientLoading } = useQuery({
     queryKey: ["client", id],
@@ -68,14 +72,11 @@ export default function ClientDetail() {
   });
 
   const client = serverClient || clients.find((c) => c.id === id);
-  const clientDocs = serverDocs?.length ? serverDocs : useMemo(() => documents.filter((d) => d.clientId === id), [id]);
+  const clientDocs = useMemo(() => 
+    serverDocs?.length ? serverDocs : documents.filter((d) => d.clientId === id),
+    [serverDocs, id]
+  );
   const clientDeadlines = useMemo(() => deadlines.filter((d) => d.clientId === id), [id]);
-
-  if (isClientLoading) {
-    return <div className="p-8 text-center text-muted-foreground">Loading client details...</div>;
-  }
-
-  if (!client) return <Navigate to="/clients" replace />;
 
   const avgConfidence = Math.round(
     (clientDocs.reduce((a, d) => a + d.confidence, 0) / Math.max(1, clientDocs.length)) * 100,
@@ -184,6 +185,44 @@ export default function ClientDetail() {
     enabled: !!id
   });
 
+  const { data: reconDetail } = useQuery({
+    queryKey: ["recon-detail", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/v1/recon/${id}/unmatched`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (!res.ok) return { bank_transactions: [], ledger_entries: [] };
+      return res.json();
+    },
+    enabled: !!id
+  });
+
+  const { data: reconRecommendations } = useQuery({
+    queryKey: ["recon-recommendations", id, selectedBankTxnId],
+    queryFn: async () => {
+      if (!id || !selectedBankTxnId) return { recommendations: [] };
+      const res = await fetch(`/api/v1/recon/${id}/recommendations?bank_txn_id=${selectedBankTxnId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (!res.ok) return { recommendations: [] };
+      return res.json();
+    },
+    enabled: !!id && !!selectedBankTxnId
+  });
+
+  useEffect(() => {
+    const firstBank = reconDetail?.bank_transactions?.[0];
+    const firstLedger = reconDetail?.ledger_entries?.[0];
+
+    if (!selectedBankTxnId && firstBank) {
+      setSelectedBankTxnId(firstBank.id);
+      setFollowUpMessage(`Please clarify this ${firstBank.amount} transaction: ${firstBank.description || "unmatched bank entry"}.`);
+    }
+    if (!selectedLedgerEntryId && firstLedger) {
+      setSelectedLedgerEntryId(firstLedger.id);
+    }
+  }, [reconDetail, selectedBankTxnId, selectedLedgerEntryId]);
+
   const runReconMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/v1/recon/run", {
@@ -197,9 +236,93 @@ export default function ClientDetail() {
     onSuccess: () => {
       toast.success("Reconciliation completed");
       qc.invalidateQueries({ queryKey: ["recon-summary", id] });
+      qc.invalidateQueries({ queryKey: ["recon-detail", id] });
+      qc.invalidateQueries({ queryKey: ["recon-recommendations", id] });
     },
     onError: () => toast.error("Reconciliation failed")
   });
+
+  const matchMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedBankTxnId || !selectedLedgerEntryId) throw new Error("Select both rows first");
+      const res = await fetch("/api/v1/recon/match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        body: JSON.stringify({ bank_txn_id: selectedBankTxnId, ledger_entry_id: selectedLedgerEntryId }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Transaction matched");
+      qc.invalidateQueries({ queryKey: ["recon-summary", id] });
+      qc.invalidateQueries({ queryKey: ["recon-detail", id] });
+      qc.invalidateQueries({ queryKey: ["recon-recommendations", id] });
+      setSelectedBankTxnId(null);
+      setSelectedLedgerEntryId(null);
+    },
+    onError: (error: Error) => toast.error(error.message || "Match failed")
+  });
+
+  const askClientMutation = useMutation({
+    mutationFn: async () => {
+      if (!id) throw new Error("Missing client");
+      const res = await fetch("/api/v1/recon/ask-client", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        body: JSON.stringify({
+          client_id: id,
+          bank_txn_id: selectedBankTxnId,
+          ledger_entry_id: selectedLedgerEntryId,
+          message: followUpMessage,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: async (data) => {
+      await navigator.clipboard.writeText(data.link || "");
+      toast.success("Client follow-up link copied", { description: data.message });
+      qc.invalidateQueries({ queryKey: ["recon-detail", id] });
+    },
+    onError: (error: Error) => toast.error(error.message || "Ask client failed")
+  });
+
+  const lockMutation = useMutation({
+    mutationFn: async () => {
+      if (!id) throw new Error("Missing client");
+      const res = await fetch("/api/v1/recon/lock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token")}` },
+        body: JSON.stringify({ client_id: id, month_year: lockMonthYear }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success(`Locked ${lockMonthYear}`);
+      qc.invalidateQueries({ queryKey: ["recon-summary", id] });
+      qc.invalidateQueries({ queryKey: ["recon-detail", id] });
+    },
+    onError: (error: Error) => toast.error(error.message || "Lock failed")
+  });
+
+  if (!id) {
+    return <Navigate to="/clients" replace />;
+  }
+
+  if (isClientLoading) {
+    return <div className="p-8 text-center text-muted-foreground">Loading client details...</div>;
+  }
+
+  if (!client) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 p-8 text-center">
+        <p className="text-muted-foreground">Client not found</p>
+        <Button onClick={() => window.location.href = "/clients"}>Back to clients</Button>
+      </div>
+    );
+  }
 
   const handleDownloadReport = async () => {
     try {
@@ -440,18 +563,20 @@ export default function ClientDetail() {
           <TabsContent value="recon" className="space-y-4">
             <Card className="border-border/70 bg-card p-5 shadow-elegant">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <Select defaultValue="2024-25">
-                    <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="2024-25">FY 2024-25</SelectItem>
-                      <SelectItem value="2023-24">FY 2023-24</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">Automated Tier 1 & 2 matching engine</p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Reconciliation period</p>
+                    <Input value={lockMonthYear} onChange={(e) => setLockMonthYear(e.target.value)} className="mt-1 h-9 w-[130px] font-mono text-xs" />
+                  </div>
+                  <p className="max-w-xl text-xs text-muted-foreground">Tier 1 exact matching, Tier 2 fuzzy matching, and grouped exception handling for manual review.</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" className="gap-2" onClick={() => toast.success("Create journal flow is a stub for now")}>Create journal</Button>
                   <Button variant="outline" className="gap-2" onClick={handleDownloadReport}><Download className="h-4 w-4" /> Export PDF</Button>
+                  <Button variant="outline" className="gap-2" onClick={() => lockMutation.mutate()} disabled={lockMutation.isPending}>
+                    {lockMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
+                    Lock period
+                  </Button>
                   <Button className="gap-2 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95" onClick={() => runReconMutation.mutate()} disabled={runReconMutation.isPending}>
                     {runReconMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                     {runReconMutation.isPending ? "Running..." : "Run reconciliation"}
@@ -459,24 +584,197 @@ export default function ClientDetail() {
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-lg border border-success/30 bg-success/8 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-success">Matched</p>
-                  <p className="mt-1 font-display text-2xl font-bold num-tabular text-success">{reconSummary?.passed ?? 0}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-success">Matched bank rows</p>
+                  <p className="mt-1 font-display text-2xl font-bold num-tabular text-success">{reconSummary?.matched_bank ?? 0}</p>
                 </div>
                 <div className="rounded-lg border border-destructive/30 bg-destructive/8 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-destructive">Unmatched</p>
-                  <p className="mt-1 font-display text-2xl font-bold num-tabular text-destructive">{reconSummary?.flagged ?? 0}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-destructive">Unmatched bank rows</p>
+                  <p className="mt-1 font-display text-2xl font-bold num-tabular text-destructive">{reconSummary?.unmatched_bank ?? 0}</p>
+                </div>
+                <div className="rounded-lg border border-success/30 bg-success/8 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-success">Matched ledger rows</p>
+                  <p className="mt-1 font-display text-2xl font-bold num-tabular text-success">{reconSummary?.matched_ledger ?? 0}</p>
                 </div>
                 <div className="rounded-lg border border-border bg-muted/40 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total transactions</p>
-                  <p className="mt-1 font-display text-2xl font-bold num-tabular">{reconSummary?.total_checks ?? 0}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Locked month</p>
+                  <p className="mt-1 font-display text-2xl font-bold num-tabular">{reconSummary?.latest_lock?.month_year || "—"}</p>
                 </div>
               </div>
             </Card>
 
-            {/* Fallback: still show old mock checks if no real data */}
-            {reconciliationChecks.length > 0 && !reconSummary?.total_checks && (
+            <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
+              <Card className="border-border/70 bg-card p-0 shadow-elegant overflow-hidden">
+                <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
+                  <div>
+                    <h3 className="font-display text-sm font-bold">Unmatched bank transactions</h3>
+                    <p className="text-xs text-muted-foreground">Click a row to drive recommendations.</p>
+                  </div>
+                  <Badge variant="secondary" className="bg-muted/60">{reconDetail?.bank_transactions?.length || 0}</Badge>
+                </div>
+                <div className="max-h-[420px] overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border/60 hover:bg-transparent">
+                        <TableHead className="text-[10px] uppercase tracking-wider">Date</TableHead>
+                        <TableHead className="text-[10px] uppercase tracking-wider">Description</TableHead>
+                        <TableHead className="text-right text-[10px] uppercase tracking-wider">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(reconDetail?.bank_transactions || []).map((row: any) => {
+                        const active = selectedBankTxnId === row.id;
+                        return (
+                          <TableRow
+                            key={row.id}
+                            className={`cursor-pointer border-border/40 ${active ? "bg-primary/10" : "hover:bg-muted/30"}`}
+                            onClick={() => setSelectedBankTxnId(row.id)}
+                          >
+                            <TableCell className="py-3 text-xs num-tabular">{row.date ? format(new Date(row.date), "dd MMM") : "—"}</TableCell>
+                            <TableCell className="py-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-xs font-medium">{row.description || "Untitled bank entry"}</p>
+                                <p className="text-[10px] text-muted-foreground">{row.type} · {row.status}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-3 text-right text-xs font-semibold num-tabular">{row.amount}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
+
+              <Card className="border-border/70 bg-card p-0 shadow-elegant overflow-hidden">
+                <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
+                  <div>
+                    <h3 className="font-display text-sm font-bold">Unmatched ledger entries</h3>
+                    <p className="text-xs text-muted-foreground">Select the best ledger candidate for the chosen bank row.</p>
+                  </div>
+                  <Badge variant="secondary" className="bg-muted/60">{reconDetail?.ledger_entries?.length || 0}</Badge>
+                </div>
+                <div className="max-h-[420px] overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border/60 hover:bg-transparent">
+                        <TableHead className="text-[10px] uppercase tracking-wider">Date</TableHead>
+                        <TableHead className="text-[10px] uppercase tracking-wider">Description</TableHead>
+                        <TableHead className="text-right text-[10px] uppercase tracking-wider">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(reconDetail?.ledger_entries || []).map((row: any) => {
+                        const active = selectedLedgerEntryId === row.id;
+                        return (
+                          <TableRow
+                            key={row.id}
+                            className={`cursor-pointer border-border/40 ${active ? "bg-primary/10" : "hover:bg-muted/30"}`}
+                            onClick={() => setSelectedLedgerEntryId(row.id)}
+                          >
+                            <TableCell className="py-3 text-xs num-tabular">{row.date ? format(new Date(row.date), "dd MMM") : "—"}</TableCell>
+                            <TableCell className="py-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-xs font-medium">{row.description || "Untitled ledger entry"}</p>
+                                <p className="text-[10px] text-muted-foreground">{row.type} · {row.status}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-3 text-right text-xs font-semibold num-tabular">{row.amount}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1fr_0.95fr]">
+              <Card className="border-border/70 bg-card p-5 shadow-elegant">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-display text-sm font-bold">Smart recommendations</h3>
+                    <p className="text-xs text-muted-foreground">Top matches for the selected bank row.</p>
+                  </div>
+                  <Badge variant="outline" className="bg-muted/30">{reconRecommendations?.recommendations?.length || 0} suggestions</Badge>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {(reconRecommendations?.recommendations || []).map((item: any) => (
+                    <button
+                      key={item.ledger_entry_id}
+                      onClick={() => setSelectedLedgerEntryId(item.ledger_entry_id)}
+                      className={`w-full rounded-lg border p-3 text-left transition-colors ${selectedLedgerEntryId === item.ledger_entry_id ? "border-primary bg-primary/8" : "border-border/60 bg-muted/20 hover:bg-muted/35"}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">{item.description || "Ledger match"}</p>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">{item.date ? format(new Date(item.date), "dd MMM yyyy") : "—"} · {item.type}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold num-tabular">{item.amount}</p>
+                          <p className="text-[11px] text-primary">{Math.round((item.confidence || 0) * 100)}%</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                  {(reconRecommendations?.recommendations || []).length === 0 && (
+                    <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">Pick a bank row to surface recommendations.</div>
+                  )}
+                </div>
+              </Card>
+
+              <Card className="border-border/70 bg-card p-5 shadow-elegant">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-display text-sm font-bold">Manual resolution</h3>
+                    <p className="text-xs text-muted-foreground">Confirm the mapping or send a follow-up to the client.</p>
+                  </div>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => toast.success("Create journal flow is a stub for now")}>Create journal</Button>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Selected bank row</p>
+                    <p className="mt-1 text-sm font-medium">{reconDetail?.bank_transactions?.find((row: any) => row.id === selectedBankTxnId)?.description || "None"}</p>
+                  </div>
+                  <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Selected ledger row</p>
+                    <p className="mt-1 text-sm font-medium">{reconDetail?.ledger_entries?.find((row: any) => row.id === selectedLedgerEntryId)?.description || "None"}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <Input
+                    value={followUpMessage}
+                    onChange={(e) => setFollowUpMessage(e.target.value)}
+                    placeholder="Ask the client about this unmatched row…"
+                    className="h-10"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      className="gap-2 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95"
+                      onClick={() => matchMutation.mutate()}
+                      disabled={matchMutation.isPending || !selectedBankTxnId || !selectedLedgerEntryId}
+                    >
+                      {matchMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      Match selected
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => askClientMutation.mutate()}
+                      disabled={askClientMutation.isPending || !selectedBankTxnId}
+                    >
+                      {askClientMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                      Ask client
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {reconciliationChecks.length > 0 && !reconSummary?.total_bank && (
               <div className="space-y-3">
                 {reconciliationChecks.map((c) => (
                   <Card key={c.id} className={`border-l-4 ${c.passed ? "border-l-success" : c.severity === "critical" ? "border-l-destructive" : "border-l-warning"} border-y-border/70 border-r-border/70 bg-card p-5 shadow-elegant`}>
@@ -490,29 +788,6 @@ export default function ClientDetail() {
                           <StatusBadge status={c.passed ? "filed" : c.severity} />
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">{c.message}</p>
-
-                        {c.flagged && (
-                          <div className="mt-3 overflow-hidden rounded-lg border border-border/60">
-                            <Table>
-                              <TableHeader>
-                                <TableRow className="bg-muted/30 hover:bg-muted/30">
-                                  <TableHead className="h-8 text-[10px] font-semibold uppercase tracking-wider">Item</TableHead>
-                                  <TableHead className="h-8 text-right text-[10px] font-semibold uppercase tracking-wider">In books</TableHead>
-                                  <TableHead className="h-8 text-right text-[10px] font-semibold uppercase tracking-wider">Per portal</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {c.flagged.map((f, i) => (
-                                  <TableRow key={i} className="border-border/40 hover:bg-transparent">
-                                    <TableCell className="py-2 text-xs">{f.label}</TableCell>
-                                    <TableCell className="py-2 text-right text-xs font-semibold num-tabular">{f.book}</TableCell>
-                                    <TableCell className="py-2 text-right text-xs font-semibold num-tabular">{f.portal}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </Card>

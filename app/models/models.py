@@ -230,6 +230,7 @@ class ReconMatch(Base):
     confidence_score = Column(Float)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    match_meta = Column(JSONB)
 
 class ReconPeriodLock(Base):
     __tablename__ = "recon_period_locks"

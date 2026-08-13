@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_firm, get_current_user
 from app.core.database import get_db
 from app.models.models import Firm, QnAMessage, QnASession, User
-from app.services.llm import Gemma4OllamaService
+from app.services.llm import Gemma4OllamaService, QwenOllamaService
 from app.services.query import answer_client_query
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,11 @@ async def get_sessions(
     sessions = result.scalars().all()
 
     return [
-        SessionRes(id=str(session.id), session_name=session.session_name or "New Chat", client_id=str(session.client_id) if session.client_id else None)
+        SessionRes(
+            id=str(session.id),
+            session_name=session.session_name or "New Chat",
+            client_id=str(session.client_id) if session.client_id else None,
+        )
         for session in sessions
     ]
 
@@ -81,6 +85,13 @@ async def get_messages(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Verify session ownership
+    session_query = await db.execute(
+        select(QnASession).where(QnASession.id == session_id, QnASession.user_id == user.id)
+    )
+    if not session_query.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Session not found")
+
     query = select(QnAMessage).where(QnAMessage.session_id == session_id).order_by(QnAMessage.created_at)
     result = await db.execute(query)
     messages = result.scalars().all()
@@ -102,28 +113,38 @@ async def add_message(
     if not qna_session:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    # 1. Commit user message immediately
     user_msg = QnAMessage(session_id=qna_session.id, role="user", content=req.content)
     db.add(user_msg)
-    await db.flush()
+    await db.commit()
 
-    query_result = await answer_client_query(db, firm.id, qna_session.client_id, req.content)
+    # 2. Get answer using Qwen 2.5
+    query_result = await answer_client_query(
+        db, 
+        firm.id, 
+        qna_session.client_id, 
+        req.content,
+        model="qwen2.5:3b-instruct"
+    )
     ai_reply = query_result.get("answer", "I could not generate an answer for this client query right now.")
 
+    # 3. Save AI response
     ai_msg = QnAMessage(session_id=qna_session.id, role="ai", content=ai_reply)
     db.add(ai_msg)
 
+    # 4. Generate title using lightweight model if new conversation
     existing_messages = await db.execute(
         select(QnAMessage).where(QnAMessage.session_id == qna_session.id).order_by(QnAMessage.created_at)
     )
     conversation = existing_messages.scalars().all()
     if len(conversation) <= 2:
-        llm_service = Gemma4OllamaService()
+        title_service = Gemma4OllamaService(model_name="gemma4:e2b")
         title_prompt = (
             f"Summarize this Chartered Accountant client question into a short title with 2 to 4 words. "
             f"Question: {req.content}"
         )
         try:
-            title = await llm_service.chat(
+            title = await title_service.chat(
                 [
                     {"role": "user", "content": title_prompt},
                 ],
@@ -131,8 +152,8 @@ async def add_message(
                 num_ctx=2048,
             )
             qna_session.session_name = title.strip().strip('"') or "New Chat"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to generate session title: {e}")
 
     await db.commit()
     await db.refresh(ai_msg)

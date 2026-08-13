@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "gemma4:e2b"
+    ollama_qna_model: str = "qwen2.5:3b-instruct"
     ollama_embedding_model: str = "nomic-embed-text"
     ollama_timeout: int = 120
     ollama_max_retries: int = 3

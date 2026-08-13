@@ -236,7 +236,7 @@ export function AppSidebar() {
               </span>
             </div>
             <p className="relative mt-1 text-[11px] leading-relaxed text-sidebar-foreground/70">
-              gemma4:e2b · running locally on firm server
+              qwen2.5:3b-instruct · running locally on firm server
             </p>
           </div>
         ) : (
