@@ -23,7 +23,7 @@ async def lifespan(application: FastAPI):
     yield
 
 app = FastAPI(
-    title="LedgerOne",
+    title="Quantive",
     version=settings.app_version,
     lifespan=lifespan,
 )

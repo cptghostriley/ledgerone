@@ -1,5 +1,5 @@
 """
-Centralised email/SMTP helper for LedgerOne.
+Centralised email/SMTP helper for Quantive.
 Uses Gmail SMTP SSL (port 465) with App Password credentials.
 """
 import smtplib
@@ -38,15 +38,15 @@ def notify_admin_new_registration(firm_name: str, email: str) -> None:
     """Notify admin when a new firm registers."""
     send_email(
         to=settings.admin_email,
-        subject=f"[LedgerOne] New firm registered: {firm_name}",
+        subject=f"[Quantive] New firm registered: {firm_name}",
         body=(
-            f"A new firm has registered on LedgerOne.\n\n"
+            f"A new firm has registered on Quantive.\n\n"
             f"Firm name : {firm_name}\n"
             f"Owner email: {email}\n\n"
             f"Review and approve in the admin portal."
         ),
         html=(
-            f"<h2>New Firm Registration — LedgerOne</h2>"
+            f"<h2>New Firm Registration — Quantive</h2>"
             f"<p><strong>Firm:</strong> {firm_name}</p>"
             f"<p><strong>Owner:</strong> {email}</p>"
             f"<p>Review in the <a href='http://localhost:3000/auth'>admin portal</a>.</p>"
@@ -58,10 +58,10 @@ def send_otp_email(to: str, otp: str) -> bool:
     """Send OTP for admin login."""
     return send_email(
         to=to,
-        subject="[LedgerOne] Your Admin Login OTP",
-        body=f"Your LedgerOne Admin Login OTP is: {otp}\n\nIt is valid for a short time. Do not share it.",
+        subject="[Quantive] Your Admin Login OTP",
+        body=f"Your Quantive Admin Login OTP is: {otp}\n\nIt is valid for a short time. Do not share it.",
         html=(
-            f"<h2>LedgerOne — Admin OTP</h2>"
+            f"<h2>Quantive — Admin OTP</h2>"
             f"<p>Your one-time password is:</p>"
             f"<h1 style='letter-spacing:8px;font-size:36px;'>{otp}</h1>"
             f"<p style='color:#888;font-size:12px;'>Valid for 10 minutes. Do not share with anyone.</p>"

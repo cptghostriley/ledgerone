@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    app_name: str = "LedgerOne"
+    app_name: str = "Quantive"
     app_version: str = "0.1.0"
     debug: bool = False
     secret_key: str

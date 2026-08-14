@@ -238,7 +238,7 @@ export default function Auth() {
           </div>
 
           <div className="relative text-[12px] text-white/55">
-            © 2026 LedgerOne · Built for ICAI-registered firms in India
+            © 2026 Quantive · Built for ICAI-registered firms in India
           </div>
         </div>
 

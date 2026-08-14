@@ -252,7 +252,7 @@ export function AppHeader() {
           <DropdownMenuContent align="end" className="w-56 mt-2">
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">LedgerOne</p>
+                <p className="text-sm font-medium leading-none">Quantive</p>
                 <p className="text-xs leading-none text-muted-foreground">Workspace</p>
               </div>
             </DropdownMenuLabel>
