@@ -161,7 +161,7 @@ export default function Schemas() {
 
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95" onClick={(e) => { e.preventDefault(); openNewModal(); }}>
+              <Button className="gap-2 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90" onClick={(e) => { e.preventDefault(); openNewModal(); }}>
                 <Plus className="h-4 w-4" /> New schema
               </Button>
             </DialogTrigger>

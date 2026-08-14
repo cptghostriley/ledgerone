@@ -57,16 +57,6 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-      {/* Aurora glow within the sidebar */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-60"
-        style={{
-          background:
-            "radial-gradient(ellipse 80% 30% at 50% 0%, hsl(var(--aurora-1) / 0.25), transparent 60%), radial-gradient(ellipse 80% 30% at 50% 100%, hsl(var(--aurora-2) / 0.18), transparent 60%)",
-        }}
-      />
-
       <SidebarHeader className={`relative z-10 border-b border-sidebar-border/60 py-4 ${collapsed ? "px-2" : "px-4"}`}>
         <Logo collapsed={collapsed} />
       </SidebarHeader>
@@ -74,7 +64,7 @@ export function AppSidebar() {
       <SidebarContent className={`relative z-10 py-4 ${collapsed ? "px-2" : "px-3"}`}>
         <SidebarGroup>
           {!collapsed && (
-            <SidebarGroupLabel className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45">
+            <SidebarGroupLabel className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
               Workspace
             </SidebarGroupLabel>
           )}
@@ -89,35 +79,24 @@ export function AppSidebar() {
                       tooltip={item.title}
                       isActive={active}
                       className={[
-                        "relative h-11 overflow-hidden rounded-xl transition-all",
-                        collapsed ? "!w-12 !p-0 justify-center mx-auto" : "px-3",
-                        "hover:bg-sidebar-accent/60",
-                        "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:shadow-[0_0_0_1px_hsl(var(--sidebar-primary)/0.35),0_8px_24px_-8px_hsl(var(--aurora-1)/0.6)]",
+                        "relative h-10 overflow-hidden rounded-lg transition-colors font-medium text-sidebar-foreground",
+                        collapsed ? "!w-10 !p-0 justify-center mx-auto" : "px-3",
+                        "hover:bg-muted/70 hover:text-foreground",
+                        "data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-semibold",
                       ].join(" ")}
                     >
-                      <NavLink to={item.url} end={item.end} className="relative">
-                        {/* Active aurora swatch */}
-                        {active && (
-                          <span
-                            aria-hidden
-                            className="pointer-events-none absolute inset-0 opacity-60"
-                            style={{
-                              background:
-                                "radial-gradient(circle at 0% 50%, hsl(var(--aurora-1) / 0.5), transparent 55%), radial-gradient(circle at 100% 50%, hsl(var(--aurora-2) / 0.45), transparent 55%)",
-                            }}
-                          />
-                        )}
-                        <item.icon className="relative h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+                      <NavLink to={item.url} end={item.end} className="relative flex items-center w-full gap-2.5">
+                        <item.icon className="h-4 w-4 shrink-0" strokeWidth={active ? 2 : 1.75} />
                         {!collapsed && (
                           <>
-                            <span className="relative flex-1 text-[14px] font-medium">{item.title}</span>
+                            <span className="flex-1 text-[13.5px]">{item.title}</span>
                             {item.badge && (
                               <Badge
                                 variant="secondary"
                                 className={
                                   item.badgeVariant === "primary"
-                                    ? "relative h-5 rounded-full border-0 bg-gradient-to-r from-[hsl(var(--aurora-1))] to-[hsl(var(--aurora-2))] px-2 text-[10px] font-bold text-white shadow-glow num-tabular"
-                                    : "relative h-5 rounded-full border-0 bg-sidebar-accent/80 px-2 text-[10px] font-semibold text-sidebar-foreground num-tabular"
+                                    ? "relative h-5 rounded-full border border-primary/20 bg-primary/10 px-2 text-[10px] font-bold text-primary num-tabular"
+                                    : "relative h-5 rounded-full border-0 bg-muted px-2 text-[10px] font-semibold text-muted-foreground num-tabular"
                                 }
                               >
                                 {item.badge}
@@ -134,12 +113,12 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {!collapsed && <div className="wave-divider mx-3 my-5 opacity-60" />}
+        {!collapsed && <div className="mx-3 my-4 h-px bg-sidebar-border/60" />}
         {collapsed && <div className="mx-auto my-4 h-px w-6 bg-sidebar-border/60" />}
 
         <SidebarGroup>
           {!collapsed && (
-            <SidebarGroupLabel className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45">
+            <SidebarGroupLabel className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
               User
             </SidebarGroupLabel>
           )}
@@ -154,15 +133,15 @@ export function AppSidebar() {
                       tooltip={item.title}
                       isActive={active}
                       className={[
-                        "h-11 overflow-hidden rounded-xl transition-all",
-                        collapsed ? "!w-12 !p-0 justify-center mx-auto" : "px-3",
-                        "hover:bg-sidebar-accent/60",
-                        "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground",
+                        "h-10 overflow-hidden rounded-lg transition-colors font-medium text-sidebar-foreground",
+                        collapsed ? "!w-10 !p-0 justify-center mx-auto" : "px-3",
+                        "hover:bg-muted/70 hover:text-foreground",
+                        "data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-semibold",
                       ].join(" ")}
                     >
-                      <NavLink to={item.url}>
-                        <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
-                        {!collapsed && <span className="text-[14px] font-medium">{item.title}</span>}
+                      <NavLink to={item.url} className="flex items-center w-full gap-2.5">
+                        <item.icon className="h-4 w-4 shrink-0" strokeWidth={active ? 2 : 1.75} />
+                        {!collapsed && <span className="text-[13.5px]">{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -174,12 +153,12 @@ export function AppSidebar() {
 
         {isAdmin && (
           <>
-            {!collapsed && <div className="wave-divider mx-3 my-5 opacity-60" />}
+            {!collapsed && <div className="mx-3 my-4 h-px bg-sidebar-border/60" />}
             {collapsed && <div className="mx-auto my-4 h-px w-6 bg-sidebar-border/60" />}
 
             <SidebarGroup>
               {!collapsed && (
-                <SidebarGroupLabel className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45">
+                <SidebarGroupLabel className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
                   Firm
                 </SidebarGroupLabel>
               )}
@@ -194,15 +173,15 @@ export function AppSidebar() {
                           tooltip={item.title}
                           isActive={active}
                           className={[
-                            "h-11 overflow-hidden rounded-xl transition-all",
-                            collapsed ? "!w-12 !p-0 justify-center mx-auto" : "px-3",
-                            "hover:bg-sidebar-accent/60",
-                            "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground",
+                            "h-10 overflow-hidden rounded-lg transition-colors font-medium text-sidebar-foreground",
+                            collapsed ? "!w-10 !p-0 justify-center mx-auto" : "px-3",
+                            "hover:bg-muted/70 hover:text-foreground",
+                            "data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-semibold",
                           ].join(" ")}
                         >
-                          <NavLink to={item.url}>
-                            <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
-                            {!collapsed && <span className="text-[14px] font-medium">{item.title}</span>}
+                          <NavLink to={item.url} className="flex items-center w-full gap-2.5">
+                            <item.icon className="h-4 w-4 shrink-0" strokeWidth={active ? 2 : 1.75} />
+                            {!collapsed && <span className="text-[13.5px]">{item.title}</span>}
                           </NavLink>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -214,40 +193,6 @@ export function AppSidebar() {
           </>
         )}
       </SidebarContent>
-
-      <SidebarFooter className={`relative z-10 border-t border-sidebar-border/60 ${collapsed ? "p-2" : "p-3"}`}>
-        {!collapsed ? (
-          <div className="relative overflow-hidden rounded-xl border border-sidebar-border/80 bg-sidebar-accent/40 p-3">
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -inset-4 opacity-60 blur-2xl"
-              style={{
-                background:
-                  "radial-gradient(circle at 70% 30%, hsl(var(--aurora-2) / 0.45), transparent 60%), radial-gradient(circle at 20% 80%, hsl(var(--aurora-1) / 0.4), transparent 60%)",
-              }}
-            />
-            <div className="relative flex items-center gap-2">
-              <span className="relative grid h-2 w-2 place-items-center">
-                <span className="absolute h-2 w-2 animate-ping rounded-full bg-success opacity-70" />
-                <span className="h-1.5 w-1.5 rounded-full bg-success" />
-              </span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-accent-foreground">
-                Ollama connected
-              </span>
-            </div>
-            <p className="relative mt-1 text-[11px] leading-relaxed text-sidebar-foreground/70">
-              qwen2.5:3b-instruct · running locally on firm server
-            </p>
-          </div>
-        ) : (
-          <div className="grid h-9 place-items-center">
-            <span className="relative grid h-2 w-2 place-items-center">
-              <span className="absolute h-2 w-2 animate-ping rounded-full bg-success opacity-70" />
-              <span className="h-1.5 w-1.5 rounded-full bg-success" />
-            </span>
-          </div>
-        )}
-      </SidebarFooter>
     </Sidebar>
   );
 }

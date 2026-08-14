@@ -110,7 +110,7 @@ export default function Clients() {
 
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95">
+            <Button className="gap-2 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90">
               <Plus className="h-4 w-4" /> Add client
             </Button>
           </DialogTrigger>

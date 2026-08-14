@@ -131,12 +131,12 @@ export default function Dashboard() {
 
   const totalDocs = (data?.statusBreakdown?.processed || 0) + (data?.statusBreakdown?.review || 0) + (data?.statusBreakdown?.pending || 0) + (data?.statusBreakdown?.failed || 0);
 
-  // Exact color palette matching the 4 AI Intelligence Cubes (Emerald, Amber, Cyan, Violet)
+  // Translucent glassmorphed palette: Emerald Teal, Warm Orange, Amethyst Violet, Bright Soft Yellow (no red)
   const pieData = totalDocs > 0 ? [
-    { name: "Processed (Verified)", value: data?.statusBreakdown?.processed || 0, color: "#10b981" },
-    { name: "Under Review", value: data?.statusBreakdown?.review || 0, color: "#f59e0b" },
-    { name: "Pending Extraction", value: data?.statusBreakdown?.pending || 0, color: "#06b6d4" },
-    { name: "Failed / Flagged", value: data?.statusBreakdown?.failed || 0, color: "#8b5cf6" },
+    { name: "Processed (Verified)", value: data?.statusBreakdown?.processed || 0, color: "rgba(16, 185, 129, 0.80)" },
+    { name: "Under Review", value: data?.statusBreakdown?.review || 0, color: "rgba(249, 115, 22, 0.80)" },
+    { name: "Pending Extraction", value: data?.statusBreakdown?.pending || 0, color: "rgba(139, 92, 246, 0.80)" },
+    { name: "Failed / Flagged", value: data?.statusBreakdown?.failed || 0, color: "rgba(234, 179, 8, 0.85)" },
   ] : [
     { name: "No documents uploaded", value: 1, color: "hsl(var(--muted-foreground) / 0.25)" }
   ];
@@ -157,7 +157,7 @@ export default function Dashboard() {
             <Activity className="h-4 w-4" /> View active jobs
           </Link>
         </Button>
-        <Button asChild className="gap-2 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-95">
+        <Button asChild className="gap-2 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90">
           <Link to="/extraction">
             <UploadIcon className="h-4 w-4" /> Upload documents
           </Link>
@@ -271,8 +271,8 @@ export default function Dashboard() {
           <Card className="lg:col-span-2 relative overflow-hidden border-border/70 bg-card p-5 shadow-elegant flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-primary shadow-glow">
-                  <Layers className="h-4 w-4 text-primary-foreground" />
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+                  <Layers className="h-4 w-4 text-primary" />
                 </div>
                 <div>
                   <h2 className="font-display text-base font-bold">AI Intelligence Cubes</h2>

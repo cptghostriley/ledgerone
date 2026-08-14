@@ -95,16 +95,7 @@ export function AppHeader() {
   const hasResults = searchResults && (searchResults.clients.length > 0 || searchResults.jobs.length > 0);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/60 bg-background/60 px-4 backdrop-blur-2xl md:px-6">
-      {/* Subtle aurora wash behind the header */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 opacity-50"
-        style={{
-          background:
-            "radial-gradient(ellipse 40% 100% at 0% 50%, hsl(var(--aurora-1) / 0.10), transparent 60%), radial-gradient(ellipse 40% 100% at 100% 50%, hsl(var(--aurora-2) / 0.10), transparent 60%)",
-        }}
-      />
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/60 bg-background/80 px-4 backdrop-blur-xl md:px-6">
       <SidebarTrigger className="h-9 w-9 shrink-0 rounded-lg" />
       <Separator orientation="vertical" className="h-6" />
 
@@ -247,21 +238,14 @@ export function AppHeader() {
         <Separator orientation="vertical" className="h-6" />
 
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2.5 pl-1 outline-none text-left">
-            <div className="relative">
-              <span
-                aria-hidden
-                className="absolute -inset-0.5 rounded-full opacity-80 blur-[3px]"
-                style={{ background: "var(--gradient-aurora)" }}
-              />
-              <Avatar className="relative h-9 w-9 border border-white/20">
-                <AvatarFallback className="bg-gradient-primary text-[12px] font-bold text-primary-foreground">
-                  CA
-                </AvatarFallback>
-              </Avatar>
-            </div>
+          <DropdownMenuTrigger className="flex items-center gap-2.5 rounded-lg px-2 py-1 outline-none text-left transition-colors hover:bg-muted/60">
+            <Avatar className="h-8 w-8 border border-primary/20 bg-primary/10">
+              <AvatarFallback className="bg-primary/10 text-[11px] font-bold text-primary">
+                CA
+              </AvatarFallback>
+            </Avatar>
             <div className="hidden flex-col leading-tight md:flex">
-              <span className="text-[13px] font-semibold">My Account</span>
+              <span className="text-[13px] font-semibold text-foreground">My Account</span>
               <span className="text-[10px] text-muted-foreground">Workspace Owner</span>
             </div>
           </DropdownMenuTrigger>
