@@ -35,6 +35,7 @@ frontend/.env.*
 
 # ─── Testing & Coverage ───────────────────────────────────────────────────────
 .pytest_cache/
+.app/*.pyc
 htmlcov/
 .coverage
 coverage.xml

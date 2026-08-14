@@ -19,6 +19,7 @@ async def lifespan(application: FastAPI):
         await conn.execute(text("ALTER TABLE schema_defs ADD COLUMN IF NOT EXISTS description TEXT;"))
         await conn.execute(text("ALTER TABLE schema_defs ADD COLUMN IF NOT EXISTS doc_type VARCHAR;"))
         await conn.execute(text("ALTER TABLE schema_defs ADD COLUMN IF NOT EXISTS category VARCHAR;"))
+        await conn.execute(text("ALTER TABLE schema_defs ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;"))
     yield
 
 app = FastAPI(
