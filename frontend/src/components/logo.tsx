@@ -58,20 +58,46 @@ export function LogoMark({ className = "h-9 w-9" }: { className?: string }) {
   );
 }
 
-export function Logo({ collapsed = false, className }: { collapsed?: boolean; className?: string }) {
+export type LogoSize = "default" | "lg";
+
+export function Logo({
+  collapsed = false,
+  size = "default",
+  className,
+}: {
+  collapsed?: boolean;
+  size?: LogoSize;
+  className?: string;
+}) {
+  const isLg = size === "lg";
+
   return (
     <div className={cn("flex items-center gap-3", collapsed && "justify-center gap-0", className)}>
-      <LogoMark />
-      {!collapsed && (
-        <div className="flex flex-col leading-none">
-          <span className="font-display text-[15px] font-bold tracking-tight text-foreground">
-            Quantive
-          </span>
-          <span className="mt-1 text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
-            Your quantitative advantage
-          </span>
-        </div>
-      )}
+      <LogoMark className={isLg ? "h-11 w-11" : undefined} />
+      <div
+        className={cn(
+          "flex flex-col leading-none overflow-hidden transition-all duration-200 ease-in-out",
+          collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+        )}
+      >
+        <span
+          className={cn(
+            "font-display font-bold tracking-tight text-foreground whitespace-nowrap",
+            isLg ? "text-xl" : "text-[15px]"
+          )}
+        >
+          Quantive
+        </span>
+        <span
+          className={cn(
+            "mt-1 font-medium uppercase tracking-[0.15em] text-muted-foreground whitespace-nowrap",
+            isLg ? "text-[11px]" : "text-[10px]"
+          )}
+        >
+          Your quantitative advantage
+        </span>
+      </div>
     </div>
   );
 }
+
