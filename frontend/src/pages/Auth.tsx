@@ -34,7 +34,7 @@ export default function Auth() {
       const json = await res.json();
       localStorage.setItem("access_token", json.data.access_token);
       toast.success("Admin activated successfully");
-      navigate("/");
+      navigate("/dashboard");
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -114,7 +114,7 @@ export default function Auth() {
       const json = await res.json();
       localStorage.setItem("access_token", json.data.access_token);
       toast.success("Login successful");
-      navigate("/");
+      navigate("/dashboard");
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -294,7 +294,7 @@ export default function Auth() {
                             const json = await res.json();
                             localStorage.setItem("access_token", json.data.access_token);
                             toast.success("Login successful");
-                            navigate("/");
+                            navigate("/dashboard");
                           } catch (err: any) {
                             toast.error(err.message);
                           } finally {

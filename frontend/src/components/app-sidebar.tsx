@@ -1,6 +1,6 @@
 import { LayoutDashboard, Users, FileStack, Settings, Activity, FileSearch } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -21,7 +21,7 @@ import { Shield, Database } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 const mainItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard, end: true },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, end: true },
   { title: "Clients", url: "/clients", icon: Users, badge: "10" },
   { title: "Schemas", url: "/schemas", icon: FileSearch },
   { title: "Extraction", url: "/extraction", icon: FileStack, badge: "New", badgeVariant: "primary" as const },
@@ -58,7 +58,9 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className={`relative z-10 border-b border-sidebar-border/60 py-4 ${collapsed ? "px-2" : "px-4"}`}>
-        <Logo collapsed={collapsed} />
+        <Link to="/dashboard">
+          <Logo collapsed={collapsed} />
+        </Link>
       </SidebarHeader>
 
       <SidebarContent className={`relative z-10 py-4 ${collapsed ? "px-2" : "px-3"}`}>

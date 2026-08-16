@@ -122,6 +122,9 @@ const queryClient = new QueryClient({
   },
 });
 
+import LandingPage from "./pages/LandingPage";
+import ComingSoon from "./pages/ComingSoon";
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 const App = () => (
   <ThemeProvider>
@@ -132,10 +135,13 @@ const App = () => (
         <BrowserRouter>
           <TokenExpiryWatcher />
           <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/coming-soon" element={<ComingSoon />} />
             <Route path="/auth" element={<Auth />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/home" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/clients" element={<Clients />} />
                 <Route path="/clients/:id" element={<ClientDetail />} />
                 <Route path="/clients/:id/upload" element={<Upload />} />

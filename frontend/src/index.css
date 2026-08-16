@@ -7,7 +7,22 @@
    gradient waves with soft glows. Production-grade for a CA firm.
    All colors HSL. */
 
+.font-serif-display {
+  font-family: 'Fraunces', 'Source Serif 4', Georgia, Cambria, serif;
+}
+
 @layer base {
+  /* Hide scrollbars globally on all elements */
+  html, body, #root, *, *::before, *::after {
+    scrollbar-width: none !important; /* Firefox */
+    -ms-overflow-style: none !important; /* IE and Edge */
+  }
+  ::-webkit-scrollbar {
+    display: none !important; /* Chrome, Safari, Opera */
+    width: 0 !important;
+    height: 0 !important;
+  }
+
   :root {
     /* Light mode — soft aurora dawn (translucent ice-blues + lavender) */
     --background: 220 40% 97%;
@@ -187,14 +202,22 @@
     font-feature-settings: "tnum", "lnum";
   }
 
-  /* Iridescent text */
+  /* Iridescent / Multicolor Shifting Texture text */
   .text-aurora {
-    background: var(--gradient-aurora);
+    background: linear-gradient(
+      110deg,
+      #2563eb 0%,
+      #4f46e5 20%,
+      #0284c7 40%,
+      #7c3aed 60%,
+      #2563eb 80%,
+      #4f46e5 100%
+    );
+    background-size: 200% auto;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    background-size: 200% 200%;
-    animation: aurora-shift 12s ease-in-out infinite;
+    animation: aurora-shift 8s linear infinite;
   }
 
   /* Glass / translucent surface */
