@@ -2,9 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence, useScroll, useTransform, useInView } from "framer-motion";
 import {
-  ArrowRight, ArrowUp, CheckCircle2, Lock,
+  ArrowRight, ArrowUp, Lock,
   ChevronRight, ChevronLeft,
-  Shield, Check, Mail, Menu, X
+  Check, Mail, Menu, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/components/logo";
@@ -33,6 +33,36 @@ export default function LandingPage() {
   const [activeIdx, setActiveIdx] = useState(0);
   const [activeSecLayer, setActiveSecLayer] = useState(0);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  const touchStartX = useRef<number | null>(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diffX = touchStartX.current - touchEndX;
+    if (Math.abs(diffX) > 40) {
+      if (diffX > 0) {
+        handleNext();
+      } else {
+        handlePrev();
+      }
+    }
+    touchStartX.current = null;
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -158,18 +188,18 @@ export default function LandingPage() {
   const renderModuleCard = (m: typeof modules[0]) => {
     const prevData = m.preview;
     return (
-      <div className="w-full rounded-2xl border border-slate-200 bg-white p-5 sm:p-8 shadow-xl shadow-slate-200/50">
-        <div className="grid gap-6 lg:grid-cols-12 lg:items-center">
+      <div className="w-full rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-8 shadow-xl shadow-slate-200/50 overflow-hidden min-w-0">
+        <div className="grid gap-3.5 sm:gap-6 lg:grid-cols-12 lg:items-center min-w-0 w-full">
 
           {/* Left Column: Domain Copy */}
-          <div className="lg:col-span-5 space-y-3.5">
+          <div className="lg:col-span-5 space-y-2 sm:space-y-3.5 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="uppercase tracking-widest text-[11px] font-semibold text-[#2563eb]">
+              <span className="uppercase tracking-widest text-[10px] sm:text-[11px] font-semibold text-[#2563eb]">
                 MODULE {m.title}
               </span>
             </div>
 
-            <h3 className="font-serif-display text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            <h3 className="font-serif-display text-xl sm:text-3xl font-bold tracking-tight text-slate-900 truncate">
               {m.title}
             </h3>
 
@@ -181,46 +211,46 @@ export default function LandingPage() {
               {m.description}
             </p>
 
-            <div className="pt-3 border-t border-slate-200">
-              <p className="uppercase tracking-widest text-[10px] font-semibold text-[#2563eb] mb-1">BUILT FOR</p>
-              <p className="text-xs font-normal text-slate-700 italic">"{m.builtFor}"</p>
+            <div className="pt-2 sm:pt-3 border-t border-slate-200">
+              <p className="uppercase tracking-widest text-[9px] sm:text-[10px] font-semibold text-[#2563eb] mb-0.5 sm:mb-1">BUILT FOR</p>
+              <p className="text-[11px] sm:text-xs font-normal text-slate-700 italic">"{m.builtFor}"</p>
             </div>
           </div>
 
           {/* Right Column: Signature Document Mockup */}
-          <div className="lg:col-span-7 rounded-lg border border-slate-300 bg-[#f8fafc] text-slate-900 p-4 sm:p-5 shadow-sm">
+          <div className="lg:col-span-7 rounded-lg border border-slate-300 bg-[#f8fafc] text-slate-900 p-2.5 sm:p-5 shadow-sm overflow-hidden min-w-0 w-full">
             {/* Signature Letterhead Header */}
-            <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
-              <span className="font-mono text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-1.5 sm:pb-2 mb-2 sm:mb-3 min-w-0">
+              <span className="font-mono text-[9px] sm:text-[10px] font-medium text-slate-500 uppercase tracking-wider truncate min-w-0 flex-1">
                 {prevData.letterhead}
               </span>
-              <span className="font-mono text-[9px] font-semibold text-slate-400 uppercase tracking-widest hidden sm:inline">
+              <span className="font-mono text-[9px] font-semibold text-slate-400 uppercase tracking-widest hidden sm:inline shrink-0 ml-2">
                 CONFIDENTIAL
               </span>
             </div>
 
             {/* 1. Scrutiny Notice Response Preview */}
             {prevData.noticeTitle && (
-              <div className="space-y-3 text-xs">
-                <div className="flex flex-wrap items-center justify-between gap-1 pb-1">
-                  <span className="font-serif-display text-xs sm:text-sm font-bold text-slate-900">
+              <div className="space-y-2.5 text-xs overflow-hidden min-w-0 w-full">
+                <div className="flex flex-wrap items-center justify-between gap-1 pb-1 min-w-0">
+                  <span className="font-serif-display text-xs sm:text-sm font-bold text-slate-900 truncate flex-1 min-w-0">
                     {prevData.noticeTitle}
                   </span>
-                  <span className="font-mono text-xs font-bold text-rose-600">
+                  <span className="font-mono text-[11px] sm:text-xs font-bold text-rose-600 shrink-0">
                     Demand: {prevData.demand}
                   </span>
                 </div>
 
-                <div className="p-3 rounded-md bg-white border border-slate-200 space-y-2 shadow-xs">
+                <div className="p-2.5 sm:p-3 rounded-md bg-white border border-slate-200 space-y-2 shadow-xs overflow-hidden min-w-0 w-full">
                   <p className="uppercase tracking-wider text-[9px] font-semibold text-slate-500">VERIFIED CITATION CLAUSE</p>
-                  <p className="font-mono text-[11px] leading-relaxed text-slate-900">
+                  <p className="font-mono text-[10px] sm:text-[11px] leading-relaxed text-slate-900 break-words">
                     "{prevData.draftText}"
                   </p>
-                  <div className="flex flex-wrap items-center justify-between pt-2 border-t border-slate-200 gap-1">
-                    <span className="font-mono text-[10px] text-slate-500">
+                  <div className="flex flex-wrap items-center justify-between pt-2 border-t border-slate-200 gap-1 min-w-0">
+                    <span className="font-mono text-[9px] sm:text-[10px] text-slate-500 truncate flex-1 min-w-0">
                       Source: <span className="text-slate-900 font-semibold">{prevData.citationDoc}</span>
                     </span>
-                    <span className="rounded-md bg-rose-50 border border-rose-200 px-2 py-0.5 text-[9px] font-semibold text-rose-700">
+                    <span className="rounded-md bg-rose-50 border border-rose-200 px-2 py-0.5 text-[9px] font-semibold text-rose-700 shrink-0">
                       {prevData.status}
                     </span>
                   </div>
@@ -230,19 +260,19 @@ export default function LandingPage() {
 
             {/* 2. Statutory Calendar Preview */}
             {prevData.rows && (
-              <div className="space-y-2 text-xs">
+              <div className="space-y-2 text-xs overflow-hidden min-w-0 w-full">
                 <div className="flex justify-between items-center text-[10px] text-slate-500 font-semibold border-b border-slate-200 pb-1.5">
                   <span>CLIENT ENTITY</span>
                   <span>OBLIGATION</span>
                   <span>STATUS</span>
                 </div>
                 {prevData.rows.map(r => (
-                  <div key={r.client} className="flex justify-between items-center p-2 rounded-md bg-white border border-slate-200 text-[11px] shadow-xs">
-                    <div>
-                      <p className="font-bold text-slate-900">{r.client}</p>
-                      <p className="font-mono text-[10px] text-slate-500">{r.obligation} • Due <span className="text-slate-900">{r.due}</span></p>
+                  <div key={r.client} className="flex justify-between items-center p-2 rounded-md bg-white border border-slate-200 text-[11px] shadow-xs overflow-hidden min-w-0 gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-slate-900 truncate">{r.client}</p>
+                      <p className="font-mono text-[10px] text-slate-500 truncate">{r.obligation} • Due <span className="text-slate-900">{r.due}</span></p>
                     </div>
-                    <span className="rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                    <span className="rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-semibold text-blue-700 shrink-0">
                       {r.status}
                     </span>
                   </div>
@@ -252,16 +282,16 @@ export default function LandingPage() {
 
             {/* 3. Working Papers Extraction Table Preview */}
             {prevData.docName && (
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
-                  <span className="font-mono text-[11px] font-bold text-slate-900">{prevData.docName}</span>
-                  <span className="font-mono text-[10px] text-slate-500">BOUNDING BOX OK</span>
+              <div className="space-y-2 text-xs overflow-hidden min-w-0 w-full">
+                <div className="flex justify-between items-center border-b border-slate-200 pb-1.5 min-w-0">
+                  <span className="font-mono text-[11px] font-bold text-slate-900 truncate flex-1 min-w-0">{prevData.docName}</span>
+                  <span className="font-mono text-[10px] text-slate-500 shrink-0 ml-2">BOUNDING BOX OK</span>
                 </div>
                 {prevData.fields?.map(f => (
-                  <div key={f.name} className="flex justify-between items-center p-2 rounded-md bg-white border border-slate-200 text-[11px] shadow-xs">
-                    <span className="text-slate-500 font-medium">{f.name}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-slate-900">{f.val}</span>
+                  <div key={f.name} className="flex justify-between items-center p-2 rounded-md bg-white border border-slate-200 text-[11px] shadow-xs overflow-hidden min-w-0 gap-2">
+                    <span className="text-slate-500 font-medium truncate flex-1 min-w-0">{f.name}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="font-mono font-bold text-slate-900 text-[11px]">{f.val}</span>
                       <span className="font-mono text-[9px] font-semibold text-slate-500 bg-slate-100 px-1 py-0.5 rounded">
                         {f.conf}
                       </span>
@@ -273,15 +303,15 @@ export default function LandingPage() {
 
             {/* 4. Correspondence Client Portal Preview */}
             {prevData.clientName && (
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
-                  <span className="font-bold text-slate-900">{prevData.clientName}</span>
-                  <span className="font-mono text-[10px] text-slate-500">{prevData.approvalStatus}</span>
+              <div className="space-y-2 text-xs overflow-hidden min-w-0 w-full">
+                <div className="flex justify-between items-center border-b border-slate-200 pb-1.5 min-w-0">
+                  <span className="font-bold text-slate-900 truncate flex-1 min-w-0">{prevData.clientName}</span>
+                  <span className="font-mono text-[10px] text-slate-500 shrink-0 ml-2">{prevData.approvalStatus}</span>
                 </div>
                 {prevData.items?.map(i => (
-                  <div key={i.name} className="flex justify-between items-center p-2 rounded-md bg-white border border-slate-200 text-[11px] shadow-xs">
-                    <span className="text-slate-900">{i.name}</span>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${i.status.includes("Uploaded") ? "bg-blue-50 border border-blue-200 text-blue-700" : "bg-rose-50 border border-rose-200 text-rose-700"}`}>
+                  <div key={i.name} className="flex justify-between items-center p-2 rounded-md bg-white border border-slate-200 text-[11px] shadow-xs overflow-hidden min-w-0 gap-2">
+                    <span className="text-slate-900 truncate flex-1 min-w-0">{i.name}</span>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0 ${i.status.includes("Uploaded") ? "bg-blue-50 border border-blue-200 text-blue-700" : "bg-rose-50 border border-rose-200 text-rose-700"}`}>
                       {i.status}
                     </span>
                   </div>
@@ -291,17 +321,17 @@ export default function LandingPage() {
 
             {/* 5. Counsel Chat & Citations Preview */}
             {prevData.query && (
-              <div className="space-y-2 text-xs">
-                <div className="p-2.5 rounded-md bg-blue-50/70 border border-blue-100">
+              <div className="space-y-2 text-xs overflow-hidden min-w-0 w-full">
+                <div className="p-2.5 rounded-md bg-blue-50/70 border border-blue-100 overflow-hidden min-w-0 w-full">
                   <p className="uppercase tracking-wider text-[9px] font-semibold text-blue-600 mb-0.5">QUERY</p>
-                  <p className="font-medium text-slate-900">"{prevData.query}"</p>
+                  <p className="font-medium text-slate-900 break-words">"{prevData.query}"</p>
                 </div>
-                <div className="p-2.5 rounded-md bg-white border border-slate-200 shadow-xs">
+                <div className="p-2.5 rounded-md bg-white border border-slate-200 shadow-xs overflow-hidden min-w-0 w-full">
                   <p className="uppercase tracking-wider text-[9px] font-semibold text-blue-600 mb-0.5">RESPONSE WITH RECEIPTS</p>
-                  <p className="text-slate-900 leading-relaxed">{prevData.answer}</p>
-                  <div className="mt-2 flex flex-wrap gap-1.5 pt-2 border-t border-slate-200">
+                  <p className="text-slate-900 leading-relaxed text-[11px] break-words">{prevData.answer}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5 pt-2 border-t border-slate-200 min-w-0">
                     {prevData.citations?.map(c => (
-                      <span key={c} className="font-mono text-[10px] bg-slate-50 border border-slate-200 text-slate-900 px-2 py-0.5 rounded-md">
+                      <span key={c} className="font-mono text-[9px] sm:text-[10px] bg-slate-50 border border-slate-200 text-slate-900 px-2 py-0.5 rounded-md truncate max-w-full">
                         📄 {c}
                       </span>
                     ))}
@@ -312,16 +342,16 @@ export default function LandingPage() {
 
             {/* 6. Bench Workload & Health Preview */}
             {prevData.activeClients && (
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
+              <div className="space-y-2 text-xs overflow-hidden min-w-0 w-full">
+                <div className="flex justify-between items-center border-b border-slate-200 pb-1.5 min-w-0">
                   <span className="font-bold text-slate-900">Practice Roster</span>
-                  <span className="font-mono text-[10px] text-slate-500">{prevData.activeClients}</span>
+                  <span className="font-mono text-[10px] text-slate-500 shrink-0">{prevData.activeClients}</span>
                 </div>
                 {prevData.metrics?.map(m => (
-                  <div key={m.label} className="flex justify-between items-center p-2 rounded-md bg-white border border-slate-200 text-[11px] shadow-xs">
-                    <span className="text-slate-900">{m.label}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-slate-900">{m.val}</span>
+                  <div key={m.label} className="flex justify-between items-center p-2 rounded-md bg-white border border-slate-200 text-[11px] shadow-xs overflow-hidden min-w-0 gap-2">
+                    <span className="text-slate-900 truncate flex-1 min-w-0">{m.label}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-mono font-bold text-slate-900 text-[11px]">{m.val}</span>
                       <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-md ${m.alert ? "bg-rose-50 border border-rose-200 text-rose-700" : "bg-slate-100 text-slate-600"}`}>
                         ACTIVE
                       </span>
@@ -337,9 +367,6 @@ export default function LandingPage() {
       </div>
     );
   };
-
-  const prevIdx = (activeIdx - 1 + modules.length) % modules.length;
-  const nextIdx = (activeIdx + 1) % modules.length;
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 selection:bg-blue-600 selection:text-white overflow-x-hidden font-sans">
@@ -431,8 +458,8 @@ export default function LandingPage() {
           />
 
           {/* Extra-Large Background Parallax Title Watermark */}
-          <motion.div style={{ y: titleY, opacity: heroOpacity }} className="relative z-10 text-center w-full max-w-7xl">
-            <h1 className="font-serif-display text-[clamp(5rem,16vw,18rem)] font-bold leading-none tracking-tighter text-slate-900/[0.045] select-none uppercase">
+          <motion.div style={{ y: titleY, opacity: heroOpacity }} className="relative z-10 w-full flex justify-center items-center mx-auto overflow-hidden pointer-events-none">
+            <h1 className="font-serif-display text-[clamp(4.5rem,14.5vw,15.5rem)] font-bold leading-none tracking-tighter text-slate-900/[0.045] select-none uppercase whitespace-nowrap text-center">
               QUANTIVE
             </h1>
           </motion.div>
@@ -494,51 +521,68 @@ export default function LandingPage() {
               </p>
             </Reveal>
 
-            {/* Plain Text Tabs */}
-            <Reveal delay={0.05} className="flex overflow-x-auto sm:flex-wrap justify-start sm:justify-center items-center gap-1.5 sm:gap-2 max-w-4xl mx-auto mb-8 sm:mb-12 px-2 py-1 scrollbar-none">
-              {modules.map((m, idx) => {
-                const isActive = idx === activeIdx;
-                return (
-                  <button
-                    key={m.id}
-                    onClick={() => setActiveIdx(idx)}
-                    title={m.tagline}
-                    className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium transition-all duration-150 ${
-                      isActive
-                        ? "bg-[#2563eb] text-white font-semibold shadow-sm"
-                        : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 shadow-sm"
-                    }`}
-                  >
-                    {m.title}
-                  </button>
-                );
-              })}
-            </Reveal>
+            {/* Plain Text Tabs Container with Left & Right Gradient Edge Blur Masks */}
+            <div className="relative max-w-4xl mx-auto mb-8 sm:mb-12">
+              {/* Left Edge Blur Gradient Mask */}
+              <div className="pointer-events-none absolute left-0 top-0 bottom-0 z-20 w-8 sm:w-16 bg-gradient-to-r from-slate-50 via-slate-50/80 to-transparent sm:hidden" />
+              
+              {/* Right Edge Blur Gradient Mask */}
+              <div className="pointer-events-none absolute right-0 top-0 bottom-0 z-20 w-8 sm:w-16 bg-gradient-to-l from-slate-50 via-slate-50/80 to-transparent sm:hidden" />
+
+              <Reveal delay={0.05} className="flex overflow-x-auto sm:flex-wrap justify-start sm:justify-center items-center gap-1.5 sm:gap-2 px-6 sm:px-2 py-1 scrollbar-none">
+                {modules.map((m, idx) => {
+                  const isActive = idx === activeIdx;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => setActiveIdx(idx)}
+                      title={m.tagline}
+                      className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium transition-all duration-150 ${
+                        isActive
+                          ? "bg-[#2563eb] text-white font-semibold shadow-sm"
+                          : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 shadow-sm"
+                      }`}
+                    >
+                      {m.title}
+                    </button>
+                  );
+                })}
+              </Reveal>
+            </div>
+
+            {/* Mobile Swipe Text Indicator (Placed ABOVE card, BELOW capsules) */}
+            <div className="sm:hidden text-center -mt-4 mb-5">
+              <span className="inline-flex items-center text-[10px] font-bold text-slate-400 tracking-widest uppercase bg-white/90 border border-slate-200/90 px-3 py-1 rounded-full shadow-2xs">
+                &larr; &nbsp; swipe modules &nbsp; &rarr;
+              </span>
+            </div>
           </div>
 
-          {/* Carousel Stage with Edge Navigation & Partially Visible Blurred Adjacent Cards */}
+          {/* Carousel Stage with 3D Wheel Rotation on Mobile & Desktop */}
           <div className="relative w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Left Arrow Button */}
+            {/* Left Arrow Button (Hidden on Mobile) */}
             <button
               onClick={handlePrev}
               aria-label="Previous Module"
-              className="absolute left-1 sm:left-0 lg:-left-6 top-1/2 -translate-y-1/2 z-40 grid h-10 w-10 sm:h-11 sm:w-11 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-md transition-all hover:bg-[#2563eb] hover:text-white hover:border-[#2563eb]"
+              className="hidden sm:grid absolute left-1 sm:left-0 lg:-left-6 top-1/2 -translate-y-1/2 z-40 h-10 w-10 sm:h-11 sm:w-11 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-md transition-all hover:bg-[#2563eb] hover:text-white hover:border-[#2563eb]"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
 
-            {/* Right Arrow Button */}
+            {/* Right Arrow Button (Hidden on Mobile) */}
             <button
               onClick={handleNext}
               aria-label="Next Module"
-              className="absolute right-1 sm:right-0 lg:-right-6 top-1/2 -translate-y-1/2 z-40 grid h-10 w-10 sm:h-11 sm:w-11 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-md transition-all hover:bg-[#2563eb] hover:text-white hover:border-[#2563eb]"
+              className="hidden sm:grid absolute right-1 sm:right-0 lg:-right-6 top-1/2 -translate-y-1/2 z-40 h-10 w-10 sm:h-11 sm:w-11 place-items-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-md transition-all hover:bg-[#2563eb] hover:text-white hover:border-[#2563eb]"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
 
-            {/* Carousel Stage with 3D Wheel Rotation & Lowered Side Cards */}
+            {/* 3D Wheel Rotation Carousel Stage */}
             <div 
-              className="relative flex items-center justify-center min-h-[460px] sm:min-h-[500px] py-4 overflow-visible"
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              className="relative flex items-center justify-center min-h-[640px] sm:min-h-[500px] py-2 sm:py-4 overflow-visible touch-pan-y"
               style={{ perspective: "1200px" }}
             >
               {modules.map((m, idx) => {
@@ -551,11 +595,18 @@ export default function LandingPage() {
                 const isNext = diff === 1;
                 const isVisible = isActive || isPrev || isNext;
 
-                return (
-                  <motion.div
-                    key={m.id}
-                    initial={false}
-                    animate={{
+                const animateProps = isMobile
+                  ? {
+                      x: diff === 0 ? "0%" : diff === 1 ? "60%" : diff === -1 ? "-60%" : diff > 0 ? "110%" : "-110%",
+                      y: diff === 0 ? "0px" : isVisible ? "24px" : "60px",
+                      scale: diff === 0 ? 1 : isVisible ? 0.82 : 0.60,
+                      rotateY: diff === 0 ? 0 : diff === 1 ? -14 : diff === -1 ? 14 : diff > 0 ? -25 : 25,
+                      rotateZ: diff === 0 ? 0 : diff === 1 ? 2 : diff === -1 ? -2 : 0,
+                      opacity: diff === 0 ? 1 : isVisible ? 0.35 : 0,
+                      filter: diff === 0 ? "blur(0px)" : "blur(2.5px)",
+                      zIndex: diff === 0 ? 30 : isVisible ? 10 : 0,
+                    }
+                  : {
                       x: diff === 0 ? "0%" : diff === 1 ? "68%" : diff === -1 ? "-68%" : diff > 0 ? "130%" : "-130%",
                       y: diff === 0 ? "0px" : isVisible ? "42px" : "90px",
                       scale: diff === 0 ? 1 : isVisible ? 0.85 : 0.65,
@@ -564,9 +615,15 @@ export default function LandingPage() {
                       opacity: diff === 0 ? 1 : isVisible ? 0.42 : 0,
                       filter: diff === 0 ? "blur(0px)" : "blur(2.5px)",
                       zIndex: diff === 0 ? 30 : isVisible ? 10 : 0,
-                    }}
+                    };
+
+                return (
+                  <motion.div
+                    key={m.id}
+                    initial={false}
+                    animate={animateProps}
                     transition={{
-                      duration: 0.5,
+                      duration: 0.45,
                       ease: [0.25, 1, 0.5, 1],
                     }}
                     onClick={() => {
@@ -585,7 +642,7 @@ export default function LandingPage() {
             </div>
 
             {/* Pagination Dots */}
-            <div className="flex items-center justify-center gap-1.5 mt-4 sm:mt-6">
+            <div className="flex items-center justify-center gap-1.5 mt-5 sm:mt-6">
               {modules.map((_, idx) => (
                 <button
                   key={idx}
@@ -650,16 +707,16 @@ export default function LandingPage() {
 
                 {/* Technical Specification Guarantees Strip (No icons, no rounded cards, no individual boxes) */}
                 <div className="mt-8 border-y border-slate-200/90 py-5">
-                  <div className="grid grid-cols-3 divide-x divide-slate-200/90 text-left">
-                    <div className="pr-3 sm:pr-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/90 text-left gap-3 sm:gap-0">
+                    <div className="pb-3 sm:pb-0 sm:pr-4">
                       <p className="font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-900">LOCAL ONLY</p>
                       <p className="mt-1 text-[11px] text-slate-600 leading-snug font-normal">100% on-premise execution with zero cloud socket connections.</p>
                     </div>
-                    <div className="px-3 sm:px-4">
+                    <div className="py-3 sm:py-0 sm:px-4">
                       <p className="font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-900">HUMAN APPROVAL</p>
                       <p className="mt-1 text-[11px] text-slate-600 leading-snug font-normal">AI pre-drafts notices; partner sign-off is mandatory before filing.</p>
                     </div>
-                    <div className="pl-3 sm:pl-4">
+                    <div className="pt-3 sm:pt-0 sm:pl-4">
                       <p className="font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-900">IMMUTABLE AUDIT</p>
                       <p className="mt-1 text-[11px] text-slate-600 leading-snug font-normal">Cryptographically hashed audit log for every client document.</p>
                     </div>
@@ -669,33 +726,33 @@ export default function LandingPage() {
 
               {/* Right Side Graphic System Architecture Flow Diagram */}
               <Reveal delay={0.1} className="lg:col-span-7">
-                <div className="relative rounded-2xl border border-slate-200/90 bg-white/95 p-6 sm:p-7 shadow-xl backdrop-blur-xl min-h-[570px] flex flex-col justify-between">
+                <div className="relative rounded-2xl border border-slate-200/90 bg-white/95 p-3.5 sm:p-7 shadow-xl backdrop-blur-xl min-h-auto sm:min-h-[570px] flex flex-col justify-between">
                   
                   <div>
                     {/* Diagram Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-4 mb-5">
-                      <div className="flex items-center gap-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-3 sm:pb-4 mb-3 sm:mb-5">
+                      <div className="flex items-center gap-2">
                         <span className="relative flex h-2 w-2">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
-                        <span className="font-mono text-xs font-bold uppercase tracking-wider text-slate-900">
+                        <span className="font-mono text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-900">
                           AIR-GAPPED SYSTEM ARCHITECTURE
                         </span>
                       </div>
                       
-                      <div className="font-mono text-[11px] text-slate-500 flex items-center gap-2">
-                        <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded border border-emerald-200 font-bold">
+                      <div className="font-mono text-[10px] sm:text-[11px] text-slate-500 flex items-center gap-2">
+                        <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200 font-bold">
                           100% ON-PREMISE
                         </span>
                       </div>
                     </div>
 
                     {/* ── Visual Architecture Graphic Canvas ────────────────── */}
-                    <div className="relative rounded-xl border border-slate-200/80 bg-slate-50/70 p-5 font-mono overflow-hidden">
+                    <div className="relative rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 sm:p-5 font-mono overflow-hidden">
                       
-                      {/* SVG Connector Flow Lines */}
-                      <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-40" xmlns="http://www.w3.org/2000/svg">
+                      {/* SVG Connector Flow Lines (Desktop Only) */}
+                      <svg className="hidden sm:block absolute inset-0 w-full h-full pointer-events-none opacity-40" xmlns="http://www.w3.org/2000/svg">
                         <defs>
                           <linearGradient id="flowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                             <stop offset="0%" stopColor="#94a3b8" />
@@ -707,66 +764,66 @@ export default function LandingPage() {
                       </svg>
 
                       {/* Architectural Graphic Flow Layout */}
-                      <div className="relative z-10 space-y-6">
+                      <div className="relative z-10 space-y-2.5 sm:space-y-6">
                         
-                        {/* Top Row: Data Ingestion -> Local Engine -> Encrypted Storage */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        {/* Top Row: Data Ingestion -> Local Engine -> Encrypted Storage (3-col grid on mobile) */}
+                        <div className="grid grid-cols-3 sm:grid-cols-3 gap-1.5 sm:gap-3 text-xs">
                           
                           {/* Node 1: Ingestion */}
                           <div
                             onClick={() => setActiveSecLayer(0)}
-                            className={`cursor-pointer group rounded-lg border p-3 transition-all duration-200 ${
+                            className={`cursor-pointer group rounded-lg border p-2 sm:p-3 transition-all duration-200 ${
                               activeSecLayer === 0
                                 ? "border-[#2563eb] bg-white shadow-md ring-1 ring-[#2563eb]"
                                 : "border-slate-200 bg-white/90 hover:border-slate-300"
                             }`}
                           >
-                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold mb-1">
-                              <span>01. INGESTION</span>
-                              <span className="text-[#2563eb]">INTRANET</span>
+                            <div className="flex items-center justify-between text-[8px] sm:text-[10px] text-slate-400 font-bold mb-0.5 sm:mb-1">
+                              <span>01. INGEST</span>
+                              <span className="text-[#2563eb] hidden sm:inline">INTRANET</span>
                             </div>
-                            <div className="font-bold text-slate-900 text-xs">Client Records</div>
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              <span className="text-[9px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-semibold">Tax Notices</span>
-                              <span className="text-[9px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-semibold">Bank PDFs</span>
+                            <div className="font-bold text-slate-900 text-[10px] sm:text-xs leading-tight">Client Records</div>
+                            <div className="mt-1 flex flex-wrap gap-0.5 sm:gap-1">
+                              <span className="text-[8px] sm:text-[9px] bg-slate-100 px-1 py-0.5 rounded text-slate-600 font-semibold">Notices</span>
+                              <span className="text-[8px] sm:text-[9px] bg-slate-100 px-1 py-0.5 rounded text-slate-600 font-semibold hidden sm:inline">PDFs</span>
                             </div>
                           </div>
 
                           {/* Node 2: Local Model Engine */}
                           <div
                             onClick={() => setActiveSecLayer(0)}
-                            className={`cursor-pointer group rounded-lg border p-3 transition-all duration-200 ${
+                            className={`cursor-pointer group rounded-lg border p-2 sm:p-3 transition-all duration-200 ${
                               activeSecLayer === 0
                                 ? "border-[#2563eb] bg-blue-50/80 shadow-md ring-1 ring-[#2563eb]"
                                 : "border-blue-200/80 bg-blue-50/40 hover:border-blue-300"
                             }`}
                           >
-                            <div className="flex items-center justify-between text-[10px] text-blue-600 font-bold mb-1">
+                            <div className="flex items-center justify-between text-[8px] sm:text-[10px] text-blue-600 font-bold mb-0.5 sm:mb-1">
                               <span>02. LOCAL AI</span>
-                              <span className="bg-blue-100 px-1 rounded text-[9px]">0 API CALLS</span>
+                              <span className="bg-blue-100 px-1 rounded text-[8px] sm:text-[9px] hidden sm:inline">0 API CALLS</span>
                             </div>
-                            <div className="font-bold text-[#2563eb] text-xs">Private Model Server</div>
-                            <div className="mt-1.5 text-[10px] text-slate-600 font-normal leading-tight">
-                              Local Gemma4 / Ollama in Server RAM
+                            <div className="font-bold text-[#2563eb] text-[10px] sm:text-xs leading-tight">Private Engine</div>
+                            <div className="mt-1 text-[8px] sm:text-[10px] text-slate-600 font-normal leading-tight truncate">
+                              Ollama RAM
                             </div>
                           </div>
 
                           {/* Node 3: Encrypted Storage */}
                           <div
                             onClick={() => setActiveSecLayer(1)}
-                            className={`cursor-pointer group rounded-lg border p-3 transition-all duration-200 ${
+                            className={`cursor-pointer group rounded-lg border p-2 sm:p-3 transition-all duration-200 ${
                               activeSecLayer === 1
                                 ? "border-[#2563eb] bg-white shadow-md ring-1 ring-[#2563eb]"
                                 : "border-slate-200 bg-white/90 hover:border-slate-300"
                             }`}
                           >
-                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold mb-1">
+                            <div className="flex items-center justify-between text-[8px] sm:text-[10px] text-slate-400 font-bold mb-0.5 sm:mb-1">
                               <span>03. VAULT</span>
-                              <span className="text-emerald-600">AES-256</span>
+                              <span className="text-emerald-600 hidden sm:inline">AES-256</span>
                             </div>
-                            <div className="font-bold text-slate-900 text-xs">Encrypted Storage</div>
-                            <div className="mt-1.5 text-[10px] text-slate-600 font-normal leading-tight">
-                              Per-Tenant Isolated Client Lanes
+                            <div className="font-bold text-slate-900 text-[10px] sm:text-xs leading-tight">Encrypted</div>
+                            <div className="mt-1 text-[8px] sm:text-[10px] text-slate-600 font-normal leading-tight truncate">
+                              Isolated Lanes
                             </div>
                           </div>
 
@@ -775,50 +832,50 @@ export default function LandingPage() {
                         {/* Connection Divider Arrow */}
                         <div className="flex items-center justify-center gap-2 my-1">
                           <div className="h-px flex-1 bg-slate-200" />
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2 py-0.5 bg-white rounded border border-slate-200">
+                          <span className="text-[8px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1.5 sm:px-2 py-0.5 bg-white rounded border border-slate-200 text-center">
                             HUMAN APPROVAL GATEWAY &amp; AUDIT PIPELINE
                           </span>
                           <div className="h-px flex-1 bg-slate-200" />
                         </div>
 
-                        {/* Bottom Row: Human Gatekeeper & Immutable Audit */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        {/* Bottom Row: Human Gatekeeper & Immutable Audit (2-col grid on mobile) */}
+                        <div className="grid grid-cols-2 sm:grid-cols-2 gap-1.5 sm:gap-3 text-xs">
                           
                           {/* Node 4: Partner Human Approval Gatekeeper */}
                           <div
                             onClick={() => setActiveSecLayer(2)}
-                            className={`cursor-pointer group rounded-lg border p-3.5 transition-all duration-200 ${
+                            className={`cursor-pointer group rounded-lg border p-2 sm:p-3.5 transition-all duration-200 ${
                               activeSecLayer === 2
                                 ? "border-emerald-500 bg-emerald-50/70 shadow-md ring-1 ring-emerald-500"
                                 : "border-emerald-200 bg-emerald-50/30 hover:border-emerald-300"
                             }`}
                           >
-                            <div className="flex items-center justify-between text-[10px] text-emerald-700 font-bold mb-1">
-                              <span>04. MANDATORY PARTNER SIGN-OFF</span>
-                              <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded text-[9px]">MANDATORY</span>
+                            <div className="flex items-center justify-between text-[8px] sm:text-[10px] text-emerald-700 font-bold mb-0.5 sm:mb-1">
+                              <span>04. SIGN-OFF</span>
+                              <span className="bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded text-[8px] sm:text-[9px]">REQ</span>
                             </div>
-                            <div className="font-bold text-slate-900 text-xs">Partner Authorization Gate</div>
-                            <div className="mt-1 text-[11px] text-slate-600 font-sans italic">
-                              "AI pre-drafts. Only partner sign-off unlocks final filing export."
+                            <div className="font-bold text-slate-900 text-[10px] sm:text-xs leading-tight">Approval Gate</div>
+                            <div className="mt-0.5 text-[9px] sm:text-[11px] text-slate-600 font-sans italic truncate">
+                              Mandatory 2FA
                             </div>
                           </div>
 
                           {/* Node 5: Immutable Event Log */}
                           <div
                             onClick={() => setActiveSecLayer(3)}
-                            className={`cursor-pointer group rounded-lg border p-3.5 transition-all duration-200 ${
+                            className={`cursor-pointer group rounded-lg border p-2 sm:p-3.5 transition-all duration-200 ${
                               activeSecLayer === 3
                                 ? "border-[#2563eb] bg-white shadow-md ring-1 ring-[#2563eb]"
                                 : "border-slate-200 bg-white/90 hover:border-slate-300"
                             }`}
                           >
-                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold mb-1">
+                            <div className="flex items-center justify-between text-[8px] sm:text-[10px] text-slate-400 font-bold mb-0.5 sm:mb-1">
                               <span>05. AUDIT LAYER</span>
-                              <span className="text-slate-700">SHA-256</span>
+                              <span className="text-slate-700 hidden sm:inline">SHA-256</span>
                             </div>
-                            <div className="font-bold text-slate-900 text-xs">Immutable Event Trail</div>
-                            <div className="mt-1 text-[10px] text-slate-500 font-mono">
-                              Cryptographically chained audit trail
+                            <div className="font-bold text-slate-900 text-[10px] sm:text-xs leading-tight">Immutable Trail</div>
+                            <div className="mt-0.5 text-[9px] sm:text-[10px] text-slate-500 font-mono truncate">
+                              Hash Chained
                             </div>
                           </div>
 
@@ -827,8 +884,8 @@ export default function LandingPage() {
                       </div>
                     </div>
 
-                    {/* ── Interactive Specification Reader Panel (Fixed height to prevent jerking) ── */}
-                    <div className="mt-5 h-[108px] rounded-xl border border-slate-200 bg-white p-4 font-mono overflow-hidden">
+                    {/* ── Interactive Specification Reader Panel ── */}
+                    <div className="mt-3 sm:mt-5 min-h-[90px] sm:h-[108px] rounded-xl border border-slate-200 bg-white p-2.5 sm:p-4 font-mono overflow-hidden">
                       <AnimatePresence mode="wait">
                         {activeSecLayer === 0 && (
                           <motion.div key="spec-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-2 text-xs">

@@ -48,12 +48,12 @@ export default function ComingSoon() {
           backgroundSize: "8px 8px",
         }} />
 
-        <div className="relative z-10 max-w-3xl mx-auto space-y-6">
+        <div className="relative z-10 max-w-3xl mx-auto space-y-5 sm:space-y-6">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-indigo-300 backdrop-blur-md"
+            className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1.5 text-[11px] sm:text-xs font-semibold uppercase tracking-widest text-indigo-300 backdrop-blur-md"
           >
             <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
             Private Beta Deployment
@@ -63,9 +63,9 @@ export default function ComingSoon() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.08 }}
-            className="font-serif-display text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-white leading-tight"
+            className="font-serif-display text-2xl sm:text-4xl md:text-6xl font-bold tracking-tight text-white leading-snug sm:leading-tight max-w-2xl mx-auto text-balance"
           >
-            Quantive Workspace is <br />
+            Quantive Workspace is{" "}
             <span className="italic text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-sky-300 to-purple-300 font-normal">
               On-Boarding Select Firms.
             </span>
@@ -75,7 +75,7 @@ export default function ComingSoon() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.15 }}
-            className="text-base sm:text-lg leading-relaxed text-slate-300 max-w-xl mx-auto font-normal"
+            className="text-xs sm:text-base leading-relaxed text-slate-300 max-w-lg mx-auto font-normal px-2"
           >
             We are rolling out our air-gapped practice operating system in waves for ICAI-registered Chartered Accountant firms. Enter your work email below to request early server setup.
           </motion.p>
@@ -84,7 +84,7 @@ export default function ComingSoon() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.22 }}
-            className="mt-8 max-w-md mx-auto"
+            className="mt-6 sm:mt-8 max-w-md mx-auto w-full px-2"
           >
             {submitted ? (
               <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center backdrop-blur-md">
@@ -95,7 +95,7 @@ export default function ComingSoon() {
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2.5">
+              <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2.5 w-full">
                 <div className="relative flex-1">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input
@@ -104,10 +104,10 @@ export default function ComingSoon() {
                     placeholder="partner@yourfirm.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full h-12 rounded-xl border border-white/15 bg-white/5 pl-10 pr-4 text-sm text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 backdrop-blur-md"
+                    className="w-full h-11 sm:h-12 rounded-xl border border-white/15 bg-white/5 pl-10 pr-4 text-xs sm:text-sm text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 backdrop-blur-md"
                   />
                 </div>
-                <Button type="submit" size="lg" className="h-12 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shrink-0 gap-2">
+                <Button type="submit" size="lg" className="h-11 sm:h-12 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs sm:text-sm shadow-lg shrink-0 gap-2">
                   Request Access <ArrowRight className="h-4 w-4" />
                 </Button>
               </form>
@@ -118,7 +118,7 @@ export default function ComingSoon() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="pt-6 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-300 font-medium"
+            className="pt-4 sm:pt-6 flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-6 text-xs text-slate-300 font-medium"
           >
             <span className="flex items-center gap-1.5"><Lock className="h-3.5 w-3.5 text-emerald-400" /> Air-Gapped Local Server</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> ICAI Guidelines Compliant</span>

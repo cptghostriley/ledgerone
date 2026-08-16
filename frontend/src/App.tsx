@@ -122,8 +122,8 @@ const queryClient = new QueryClient({
   },
 });
 
-import LandingPage from "./pages/LandingPage";
-import ComingSoon from "./pages/ComingSoon";
+import LandingPage from "./landing/pages/LandingPage";
+import ComingSoon from "./landing/pages/ComingSoon";
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 const App = () => (
